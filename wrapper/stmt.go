@@ -9,8 +9,8 @@ package wrapper
 import "C"
 import (
 	"errors"
-	"github.com/taosdata/driver-go/v2/common"
-	taosTypes "github.com/taosdata/driver-go/v2/types"
+	"github.com/i-Things/driver-go/v2/common"
+	taosTypes "github.com/i-Things/driver-go/v2/types"
 	"unsafe"
 )
 

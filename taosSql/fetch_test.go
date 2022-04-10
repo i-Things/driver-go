@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/taosdata/driver-go/v2/types"
+	"github.com/i-Things/driver-go/v2/types"
 )
 
 // @author: xftan

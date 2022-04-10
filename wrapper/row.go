@@ -9,7 +9,7 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v2/common"
+	"github.com/i-Things/driver-go/v2/common"
 )
 
 const (

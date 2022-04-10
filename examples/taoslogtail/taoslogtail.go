@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	taos "github.com/taosdata/driver-go/v2/af"
+	taos "github.com/i-Things/driver-go/v2/af"
 )
 
 func main() {

@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v2/common"
-	"github.com/taosdata/driver-go/v2/errors"
+	"github.com/i-Things/driver-go/v2/common"
+	"github.com/i-Things/driver-go/v2/errors"
 )
 
 type RowsHeader struct {

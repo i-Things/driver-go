@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/taosdata/driver-go/v2/taosRestful"
-	_ "github.com/taosdata/driver-go/v2/taosSql"
+	_ "github.com/i-Things/driver-go/v2/taosRestful"
+	_ "github.com/i-Things/driver-go/v2/taosSql"
 )
 
 var cdb *sql.DB

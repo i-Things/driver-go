@@ -1,7 +1,7 @@
 package param
 
 import (
-	taosTypes "github.com/taosdata/driver-go/v2/types"
+	taosTypes "github.com/i-Things/driver-go/v2/types"
 	"time"
 )
 

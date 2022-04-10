@@ -6,10 +6,10 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/i-Things/driver-go/v2/common"
+	"github.com/i-Things/driver-go/v2/errors"
+	"github.com/i-Things/driver-go/v2/wrapper/cgo"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v2/common"
-	"github.com/taosdata/driver-go/v2/errors"
-	"github.com/taosdata/driver-go/v2/wrapper/cgo"
 )
 
 // @author: xftan

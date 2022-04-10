@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/taosdata/driver-go/v2/af/param"
-	"github.com/taosdata/driver-go/v2/common"
+	"github.com/i-Things/driver-go/v2/af/param"
+	"github.com/i-Things/driver-go/v2/common"
 )
 
 func testDatabase(t *testing.T) *Connector {

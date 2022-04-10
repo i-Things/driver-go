@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/i-Things/driver-go/v2/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v2/errors"
 )
 
 // @author: xftan

@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/taosdata/driver-go/v2/taosSql"
+	_ "github.com/i-Things/driver-go/v2/taosSql"
 	"log"
 	"time"
 )

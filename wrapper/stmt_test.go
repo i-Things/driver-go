@@ -7,9 +7,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v2/common"
-	taosError "github.com/taosdata/driver-go/v2/errors"
-	taosTypes "github.com/taosdata/driver-go/v2/types"
+	"github.com/i-Things/driver-go/v2/common"
+	taosError "github.com/i-Things/driver-go/v2/errors"
+	taosTypes "github.com/i-Things/driver-go/v2/types"
 )
 
 // @author: xftan
