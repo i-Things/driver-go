@@ -7,6 +7,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/i-Things/driver-go/v2/common"
+	taosErrors "github.com/i-Things/driver-go/v2/errors"
+	jsonitor "github.com/json-iterator/go"
+	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -15,10 +19,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/i-Things/driver-go/v2/common"
-	taosErrors "github.com/i-Things/driver-go/v2/errors"
-	jsonitor "github.com/json-iterator/go"
 )
 
 var jsonI = jsonitor.ConfigCompatibleWithStandardLibrary
@@ -148,6 +148,7 @@ func (tc *taosConn) CheckNamedValue(nv *driver.NamedValue) (err error) {
 }
 
 func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (*common.TDEngineRestfulResp, error) {
+	logx.WithContext(ctx).Slow("taosQuery:", sql)
 	body := ioutil.NopCloser(strings.NewReader(sql))
 	req := &http.Request{
 		Method:     http.MethodPost,
@@ -169,6 +170,8 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 && resp.StatusCode != 400 {
 		body, err := ioutil.ReadAll(resp.Body)
+		bodyStr := string(body)
+		fmt.Println(bodyStr)
 		if err != nil {
 			return nil, err
 		}
