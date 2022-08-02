@@ -148,7 +148,12 @@ func (tc *taosConn) CheckNamedValue(nv *driver.NamedValue) (err error) {
 }
 
 func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (*common.TDEngineRestfulResp, error) {
-	logx.WithContext(ctx).Slow("taosQuery:", sql)
+	var start = time.Now().UnixMilli()
+	defer func() {
+		now := time.Now().UnixMilli()
+		logx.WithContext(ctx).Infof("taosQuery use:%vms sql:%v", now-start, sql)
+	}()
+
 	body := ioutil.NopCloser(strings.NewReader(sql))
 	req := &http.Request{
 		Method:     http.MethodPost,
