@@ -2,6 +2,7 @@ package common
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -70,9 +71,21 @@ func InterpolateParams(query string, args []driver.Value) (string, error) {
 			buf.WriteString(t)
 			buf.WriteByte('\'')
 		case []byte:
+			buf.WriteByte('\'')
 			buf.Write(v)
+			buf.WriteByte('\'')
 		case string:
+			buf.WriteByte('\'')
 			buf.WriteString(v)
+			buf.WriteByte('\'')
+		case map[string]interface{}, []interface{}:
+			jsonByte, err := json.Marshal(v)
+			if err != nil {
+				return "", driver.ErrSkip
+			}
+			buf.WriteByte('\'')
+			buf.Write(jsonByte)
+			buf.WriteByte('\'')
 		default:
 			return "", driver.ErrSkip
 		}

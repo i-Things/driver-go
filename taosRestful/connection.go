@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -146,6 +147,11 @@ func (tc *taosConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.
 }
 
 func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (*common.TDEngineRestfulResp, error) {
+	var start = time.Now().UnixMilli()
+	defer func() {
+		now := time.Now().UnixMilli()
+		logx.WithContext(ctx).Infof("taosQuery use:%vms sql:%v", now-start, sql)
+	}()
 	body := ioutil.NopCloser(strings.NewReader(sql))
 	req := &http.Request{
 		Method:     http.MethodPost,
