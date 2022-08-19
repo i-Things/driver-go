@@ -5,8 +5,13 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	jsonitor "github.com/json-iterator/go"
+	"github.com/spf13/cast"
+	"github.com/taosdata/driver-go/v3/common"
+	taosErrors "github.com/taosdata/driver-go/v3/errors"
 	"github.com/zeromicro/go-zero/core/logx"
 	"io"
 	"io/ioutil"
@@ -15,10 +20,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	jsonitor "github.com/json-iterator/go"
-	"github.com/taosdata/driver-go/v3/common"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
 )
 
 var jsonI = jsonitor.ConfigCompatibleWithStandardLibrary
@@ -109,7 +110,7 @@ func (tc *taosConn) Exec(query string, args []driver.Value) (driver.Result, erro
 	if len(result.Data) != 1 || len(result.Data[0]) != 1 {
 		return nil, errors.New("wrong result")
 	}
-	return driver.RowsAffected(result.Data[0][0].(int32)), nil
+	return driver.RowsAffected(cast.ToInt32(result.Data[0][0])), nil
 }
 
 func (tc *taosConn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -185,14 +186,20 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 			return nil, err
 		}
 	}
-	data, err := marshalBody(respBody, bufferSize)
+	bodyByte, err := ioutil.ReadAll(respBody)
+	if err != nil {
+		return nil, err
+	}
+	var data common.TDEngineRestfulResp
+	err = json.Unmarshal(bodyByte, &data)
+	//data, err := marshalBody(respBody, bufferSize)
 	if err != nil {
 		return nil, err
 	}
 	if data.Code != 0 {
 		return nil, taosErrors.NewError(data.Code, data.Desc)
 	}
-	return data, nil
+	return &data, nil
 }
 
 const HTTPDTimeFormat = "2006-01-02T15:04:05.999999999-0700"
