@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	jsonitor "github.com/json-iterator/go"
@@ -13,6 +12,8 @@ import (
 	"github.com/taosdata/driver-go/v3/common"
 	taosErrors "github.com/taosdata/driver-go/v3/errors"
 	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/syncx"
+	"github.com/zeromicro/go-zero/core/timex"
 	"io"
 	"io/ioutil"
 	"net"
@@ -23,6 +24,15 @@ import (
 )
 
 var jsonI = jsonitor.ConfigCompatibleWithStandardLibrary
+
+const defaultSlowThreshold = time.Millisecond * 500
+
+var slowThreshold = syncx.ForAtomicDuration(defaultSlowThreshold)
+
+// SetSlowThreshold sets the slow threshold.
+func SetSlowThreshold(threshold time.Duration) {
+	slowThreshold.Set(threshold)
+}
 
 type taosConn struct {
 	cfg            *config
@@ -148,11 +158,6 @@ func (tc *taosConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.
 }
 
 func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (*common.TDEngineRestfulResp, error) {
-	var start = time.Now().UnixMilli()
-	defer func() {
-		now := time.Now().UnixMilli()
-		logx.WithContext(ctx).Infof("taosQuery use:%vms sql:%v", now-start, sql)
-	}()
 	body := ioutil.NopCloser(strings.NewReader(sql))
 	req := &http.Request{
 		Method:     http.MethodPost,
@@ -167,7 +172,14 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 	if ctx != nil {
 		req = req.WithContext(ctx)
 	}
+	startTime := timex.Now()
+	duration := timex.Since(startTime)
 	resp, err := tc.client.Do(req)
+	if duration > slowThreshold.Load() {
+		logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosQuery: slowcall - %s", sql)
+	} else {
+		logx.WithContext(ctx).WithDuration(duration).Infof("sql taosQuery: %s", sql)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -186,20 +198,14 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 			return nil, err
 		}
 	}
-	bodyByte, err := ioutil.ReadAll(respBody)
-	if err != nil {
-		return nil, err
-	}
-	var data common.TDEngineRestfulResp
-	err = json.Unmarshal(bodyByte, &data)
-	//data, err := marshalBody(respBody, bufferSize)
+	data, err := marshalBody(respBody, bufferSize)
 	if err != nil {
 		return nil, err
 	}
 	if data.Code != 0 {
 		return nil, taosErrors.NewError(data.Code, data.Desc)
 	}
-	return &data, nil
+	return data, nil
 }
 
 const HTTPDTimeFormat = "2006-01-02T15:04:05.999999999-0700"
@@ -209,7 +215,7 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 	iter := jsonI.BorrowIterator(make([]byte, bufferSize))
 	defer jsonI.ReturnIterator(iter)
 	iter.Reset(body)
-	timeFormat := time.RFC3339Nano
+	timeFormat := "2006-01-02 15:04:05.000"
 	iter.ReadObjectCB(func(iter *jsonitor.Iterator, s string) bool {
 		switch s {
 		case "code":
@@ -225,14 +231,16 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 						result.ColNames = append(result.ColNames, iter.ReadString())
 						index = 1
 					case 1:
-						typeStr := iter.ReadString()
-						t, exist := common.NameTypeMap[typeStr]
-						if exist {
-							result.ColTypes = append(result.ColTypes, t)
-						} else {
-							iter.ReportError("unsupported type in column_meta", typeStr)
-						}
+						result.ColTypes = append(result.ColTypes, iter.ReadInt())
 						index = 2
+						//typeStr := iter.ReadString()
+						//t, exist := common.NameTypeMap[typeStr]
+						//if exist {
+						//	result.ColTypes = append(result.ColTypes, t)
+						//} else {
+						//	iter.ReportError("unsupported type in column_meta", typeStr)
+						//}
+						//index = 2
 					case 2:
 						result.ColLength = append(result.ColLength, iter.ReadInt64())
 						index = 0
