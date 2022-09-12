@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	jsonitor "github.com/json-iterator/go"
-	"github.com/spf13/cast"
 	"github.com/taosdata/driver-go/v3/common"
 	taosErrors "github.com/taosdata/driver-go/v3/errors"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -120,7 +119,7 @@ func (tc *taosConn) Exec(query string, args []driver.Value) (driver.Result, erro
 	if len(result.Data) != 1 || len(result.Data[0]) != 1 {
 		return nil, errors.New("wrong result")
 	}
-	return driver.RowsAffected(cast.ToInt32(result.Data[0][0])), nil
+	return driver.RowsAffected(result.Data[0][0].(int32)), nil
 }
 
 func (tc *taosConn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -215,7 +214,7 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 	iter := jsonI.BorrowIterator(make([]byte, bufferSize))
 	defer jsonI.ReturnIterator(iter)
 	iter.Reset(body)
-	timeFormat := "2006-01-02 15:04:05.000"
+	timeFormat := time.RFC3339Nano
 	iter.ReadObjectCB(func(iter *jsonitor.Iterator, s string) bool {
 		switch s {
 		case "code":
@@ -231,16 +230,14 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 						result.ColNames = append(result.ColNames, iter.ReadString())
 						index = 1
 					case 1:
-						result.ColTypes = append(result.ColTypes, iter.ReadInt())
+						typeStr := iter.ReadString()
+						t, exist := common.NameTypeMap[typeStr]
+						if exist {
+							result.ColTypes = append(result.ColTypes, t)
+						} else {
+							iter.ReportError("unsupported type in column_meta", typeStr)
+						}
 						index = 2
-						//typeStr := iter.ReadString()
-						//t, exist := common.NameTypeMap[typeStr]
-						//if exist {
-						//	result.ColTypes = append(result.ColTypes, t)
-						//} else {
-						//	iter.ReportError("unsupported type in column_meta", typeStr)
-						//}
-						//index = 2
 					case 2:
 						result.ColLength = append(result.ColLength, iter.ReadInt64())
 						index = 0
