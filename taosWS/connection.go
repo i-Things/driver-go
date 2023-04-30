@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/syncx"
+	"github.com/zeromicro/go-zero/core/timex"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -27,6 +30,15 @@ const (
 	WSFetchBlock = "fetch_block"
 	WSFreeResult = "free_result"
 )
+
+const defaultSlowThreshold = time.Millisecond * 500
+
+var slowThreshold = syncx.ForAtomicDuration(defaultSlowThreshold)
+
+// SetSlowThreshold sets the slow threshold.
+func SetSlowThreshold(threshold time.Duration) {
+	slowThreshold.Set(threshold)
+}
 
 var (
 	NotQueryError    = errors.New("sql is an update statement not a query statement")
@@ -110,7 +122,7 @@ func (tc *taosConn) ExecContext(ctx context.Context, query string, args []driver
 	return tc.execCtx(ctx, query, args)
 }
 
-func (tc *taosConn) execCtx(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (tc *taosConn) execCtx(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if len(args) != 0 {
 		if !tc.cfg.interpolateParams {
 			return nil, driver.ErrSkip
@@ -122,11 +134,21 @@ func (tc *taosConn) execCtx(_ context.Context, query string, args []driver.Named
 		}
 		query = prepared
 	}
+
 	reqID := tc.generateReqID()
 	req := &WSQueryReq{
 		ReqID: reqID,
 		SQL:   query,
 	}
+	startTime := timex.Now()
+	duration := timex.Since(startTime)
+	defer func() {
+		if duration > slowThreshold.Load() {
+			logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosWsQuery reqID:%v slowcall query: %s", reqID, query)
+		} else {
+			logx.WithContext(ctx).WithDuration(duration).Infof("[SQL] taosWsQuery reqID:%v query: %s", reqID, query)
+		}
+	}()
 	reqArgs, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
