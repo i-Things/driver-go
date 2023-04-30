@@ -20,9 +20,11 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
-var jsonI = jsonitor.ConfigCompatibleWithStandardLibrary
+var jsonI = jsoniter.ConfigCompatibleWithStandardLibrary
 
 const defaultSlowThreshold = time.Millisecond * 500
 
@@ -101,6 +103,14 @@ func (tc *taosConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (tc *taosConn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	return tc.ExecContext(context.Background(), query, common.ValueArgsToNamedValueArgs(args))
+}
+
+func (tc *taosConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (result driver.Result, err error) {
+	return tc.execCtx(ctx, query, args)
+}
+
+func (tc *taosConn) execCtx(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if len(args) != 0 {
 		if !tc.cfg.interpolateParams {
 			return nil, driver.ErrSkip
@@ -112,7 +122,7 @@ func (tc *taosConn) Exec(query string, args []driver.Value) (driver.Result, erro
 		}
 		query = prepared
 	}
-	result, err := tc.taosQuery(context.TODO(), query, 512)
+	result, err := tc.taosQuery(ctx, query, 512)
 	if err != nil {
 		return nil, err
 	}
@@ -128,13 +138,43 @@ func (tc *taosConn) Query(query string, args []driver.Value) (driver.Rows, error
 			return nil, driver.ErrSkip
 		}
 		// try client-side prepare to reduce round trip
-		prepared, err := common.InterpolateParams(query, args)
+		prepared, err := common.InterpolateParams(query, common.ValueArgsToNamedValueArgs(args))
 		if err != nil {
 			return nil, err
 		}
 		query = prepared
 	}
 	result, err := tc.taosQuery(context.TODO(), query, tc.readBufferSize)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, errors.New("wrong result")
+	}
+	// Read Result
+	rs := &rows{
+		result: result,
+	}
+	return rs, err
+}
+
+func (tc *taosConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (rows driver.Rows, err error) {
+	return tc.queryCtx(ctx, query, args)
+}
+
+func (tc *taosConn) queryCtx(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if len(args) != 0 {
+		if !tc.cfg.interpolateParams {
+			return nil, driver.ErrSkip
+		}
+		// try client-side prepare to reduce round trip
+		prepared, err := common.InterpolateParams(query, args)
+		if err != nil {
+			return nil, err
+		}
+		query = prepared
+	}
+	result, err := tc.taosQuery(ctx, query, tc.readBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -207,24 +247,22 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 	return data, nil
 }
 
-const HTTPDTimeFormat = "2006-01-02T15:04:05.999999999-0700"
-
 func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, error) {
 	var result common.TDEngineRestfulResp
 	iter := jsonI.BorrowIterator(make([]byte, bufferSize))
 	defer jsonI.ReturnIterator(iter)
 	iter.Reset(body)
 	timeFormat := time.RFC3339Nano
-	iter.ReadObjectCB(func(iter *jsonitor.Iterator, s string) bool {
+	iter.ReadObjectCB(func(iter *jsoniter.Iterator, s string) bool {
 		switch s {
 		case "code":
 			result.Code = iter.ReadInt()
 		case "desc":
 			result.Desc = iter.ReadString()
 		case "column_meta":
-			iter.ReadArrayCB(func(iter *jsonitor.Iterator) bool {
+			iter.ReadArrayCB(func(iter *jsoniter.Iterator) bool {
 				index := 0
-				iter.ReadArrayCB(func(iter *jsonitor.Iterator) bool {
+				iter.ReadArrayCB(func(iter *jsoniter.Iterator) bool {
 					switch index {
 					case 0:
 						result.ColNames = append(result.ColNames, iter.ReadString())
@@ -249,10 +287,10 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 		case "data":
 			columnCount := len(result.ColTypes)
 			column := 0
-			iter.ReadArrayCB(func(iter *jsonitor.Iterator) bool {
+			iter.ReadArrayCB(func(iter *jsoniter.Iterator) bool {
 				column = 0
 				var row = make([]driver.Value, columnCount)
-				iter.ReadArrayCB(func(iter *jsonitor.Iterator) bool {
+				iter.ReadArrayCB(func(iter *jsoniter.Iterator) bool {
 					defer func() {
 						column += 1
 					}()

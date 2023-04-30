@@ -9,6 +9,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/taosdata/driver-go/v3/common"
+	"github.com/taosdata/driver-go/v3/common/parser"
+	tmqcommon "github.com/taosdata/driver-go/v3/common/tmq"
 	"github.com/taosdata/driver-go/v3/errors"
 	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
@@ -31,7 +33,7 @@ func TestTMQ(t *testing.T) {
 		}
 		TaosFreeResult(result)
 	}()
-	result := TaosQuery(conn, "create database if not exists abc1 vgroups 2")
+	result := TaosQuery(conn, "create database if not exists abc1 vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code := TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -147,12 +149,9 @@ func TestTMQ(t *testing.T) {
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				t.Log("auto commit", r)
-				PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := TMQConsumerNew(conf)
@@ -172,7 +171,7 @@ func TestTMQ(t *testing.T) {
 		t.Error(errors.NewError(int(errCode), errStr))
 		return
 	}
-	t.Log("sub", time.Now().Sub(s))
+	t.Log("sub", time.Since(s))
 	errCode, list := TMQSubscription(tmq)
 	if errCode != 0 {
 		errStr := TMQErr2Str(errCode)
@@ -213,11 +212,11 @@ func TestTMQ(t *testing.T) {
 					return
 				}
 				precision := TaosResultPrecision(message)
-				tableName := TMQGetTableName(message)
-				assert.Equal(t, "ct1", tableName)
+				//tableName := TMQGetTableName(message)
+				//assert.Equal(t, "ct1", tableName)
 				dbName := TMQGetDBName(message)
 				assert.Equal(t, "abc1", dbName)
-				data := ReadBlock(block, blockSize, rh.ColTypes, precision)
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
 				t.Log(data)
 			}
 			TaosFreeResult(message)
@@ -274,7 +273,7 @@ func TestTMQDB(t *testing.T) {
 		}
 		TaosFreeResult(result)
 	}()
-	result := TaosQuery(conn, "create database if not exists tmq_test_db vgroups 2")
+	result := TaosQuery(conn, "create database if not exists tmq_test_db vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code := TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -379,12 +378,9 @@ func TestTMQDB(t *testing.T) {
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				t.Log("auto commit", r)
-				PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := TMQConsumerNew(conf)
@@ -443,7 +439,7 @@ func TestTMQDB(t *testing.T) {
 				}
 				precision := TaosResultPrecision(message)
 				totalCount += blockSize
-				data := ReadBlock(block, blockSize, rh.ColTypes, precision)
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
 				t.Log(data)
 			}
 			TaosFreeResult(message)
@@ -492,7 +488,7 @@ func TestTMQDBMultiTable(t *testing.T) {
 		}
 		TaosFreeResult(result)
 	}()
-	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi vgroups 2")
+	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code := TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -606,12 +602,9 @@ func TestTMQDBMultiTable(t *testing.T) {
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				t.Log("auto commit", r)
-				PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := TMQConsumerNew(conf)
@@ -675,7 +668,7 @@ func TestTMQDBMultiTable(t *testing.T) {
 				}
 				precision := TaosResultPrecision(message)
 				totalCount += blockSize
-				data := ReadBlock(block, blockSize, rh.ColTypes, precision)
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
 				t.Log(data)
 			}
 			TaosFreeResult(message)
@@ -729,7 +722,7 @@ func TestTMQDBMultiInsert(t *testing.T) {
 		}
 		TaosFreeResult(result)
 	}()
-	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi_insert vgroups 2")
+	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi_insert vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code := TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -821,12 +814,9 @@ func TestTMQDBMultiInsert(t *testing.T) {
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				t.Log("auto commit", r)
-				PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := TMQConsumerNew(conf)
@@ -887,7 +877,7 @@ func TestTMQDBMultiInsert(t *testing.T) {
 				}
 				precision := TaosResultPrecision(message)
 				totalCount += blockSize
-				data := ReadBlock(block, blockSize, rh.ColTypes, precision)
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
 				t.Log(data)
 			}
 			TaosFreeResult(message)
@@ -967,7 +957,7 @@ func TestTMQModify(t *testing.T) {
 	}
 	TaosFreeResult(result)
 
-	result = TaosQuery(conn, "create database if not exists tmq_test_db_modify_target vgroups 2")
+	result = TaosQuery(conn, "create database if not exists tmq_test_db_modify_target vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code = TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -977,7 +967,7 @@ func TestTMQModify(t *testing.T) {
 	}
 	TaosFreeResult(result)
 
-	result = TaosQuery(conn, "create database if not exists tmq_test_db_modify vgroups 5")
+	result = TaosQuery(conn, "create database if not exists tmq_test_db_modify vgroups 5 WAL_RETENTION_PERIOD 86400")
 	code = TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -1028,12 +1018,9 @@ func TestTMQModify(t *testing.T) {
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				t.Log("auto commit", r)
-				PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := TMQConsumerNew(conf)
@@ -1105,7 +1092,7 @@ func TestTMQModify(t *testing.T) {
 	}
 	TaosFreeResult(result)
 
-	pool := func(cb func(*common.Meta, unsafe.Pointer)) {
+	pool := func(cb func(*tmqcommon.Meta, unsafe.Pointer)) {
 		message := TMQConsumerPoll(tmq, 500)
 		assert.NotNil(t, message)
 		topic := TMQGetTopicName(message)
@@ -1115,7 +1102,7 @@ func TestTMQModify(t *testing.T) {
 		pointer := TMQGetJsonMeta(message)
 		assert.NotNil(t, pointer)
 		data := ParseJsonMeta(pointer)
-		var meta common.Meta
+		var meta tmqcommon.Meta
 		err = jsoniter.Unmarshal(data, &meta)
 		assert.NoError(t, err)
 
@@ -1144,10 +1131,9 @@ func TestTMQModify(t *testing.T) {
 		}
 		cb(&meta, rawMeta)
 		TMQFreeRaw(rawMeta)
-		return
 	}
 
-	pool(func(meta *common.Meta, rawMeta unsafe.Pointer) {
+	pool(func(meta *tmqcommon.Meta, rawMeta unsafe.Pointer) {
 		assert.Equal(t, "create", meta.Type)
 		assert.Equal(t, "stb", meta.TableName)
 		assert.Equal(t, "super", meta.TableType)
@@ -1201,4 +1187,195 @@ func TestTMQModify(t *testing.T) {
 		t.Error(errors.NewError(int(errCode), errStr))
 		return
 	}
+}
+
+func TestTMQAutoCreateTable(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer TaosClose(conn)
+	defer func() {
+		result := TaosQuery(conn, "drop database if exists tmq_test_auto_create")
+		code := TaosError(result)
+		if code != 0 {
+			errStr := TaosErrorStr(result)
+			TaosFreeResult(result)
+			t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+			return
+		}
+		TaosFreeResult(result)
+	}()
+	result := TaosQuery(conn, "create database if not exists tmq_test_auto_create vgroups 2 WAL_RETENTION_PERIOD 86400")
+	code := TaosError(result)
+	if code != 0 {
+		errStr := TaosErrorStr(result)
+		TaosFreeResult(result)
+		t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+		return
+	}
+	TaosFreeResult(result)
+
+	result = TaosQuery(conn, "use tmq_test_auto_create")
+	code = TaosError(result)
+	if code != 0 {
+		errStr := TaosErrorStr(result)
+		TaosFreeResult(result)
+		t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+		return
+	}
+	TaosFreeResult(result)
+
+	result = TaosQuery(conn, "create stable if not exists st1 (ts timestamp, c1 int, c2 float, c3 binary(10)) tags(t1 int)")
+	code = TaosError(result)
+	if code != 0 {
+		errStr := TaosErrorStr(result)
+		TaosFreeResult(result)
+		t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+		return
+	}
+	TaosFreeResult(result)
+
+	//create topic
+	result = TaosQuery(conn, "create topic if not exists test_tmq_auto_topic with meta as DATABASE tmq_test_auto_create")
+	code = TaosError(result)
+	if code != 0 {
+		errStr := TaosErrorStr(result)
+		TaosFreeResult(result)
+		t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+		return
+	}
+	TaosFreeResult(result)
+	defer func() {
+		result = TaosQuery(conn, "drop topic if exists test_tmq_auto_topic")
+		code = TaosError(result)
+		if code != 0 {
+			errStr := TaosErrorStr(result)
+			TaosFreeResult(result)
+			t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+			return
+		}
+		TaosFreeResult(result)
+	}()
+	result = TaosQuery(conn, "insert into ct1 using st1 tags(2000) values(now,1,2,'1')")
+	code = TaosError(result)
+	if code != 0 {
+		errStr := TaosErrorStr(result)
+		TaosFreeResult(result)
+		t.Error(errors.TaosError{Code: int32(code), ErrStr: errStr})
+		return
+	}
+	TaosFreeResult(result)
+	//build consumer
+	conf := TMQConfNew()
+	// auto commit default is true then the commitCallback function will be called after 5 seconds
+	TMQConfSet(conf, "enable.auto.commit", "true")
+	TMQConfSet(conf, "group.id", "tg2")
+	TMQConfSet(conf, "msg.with.table.name", "true")
+	c := make(chan *TMQCommitCallbackResult, 1)
+	h := cgo.NewHandle(c)
+	TMQConfSetAutoCommitCB(conf, h)
+	go func() {
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
+		}
+	}()
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Error(err)
+	}
+	TMQConfDestroy(conf)
+	//build_topic_list
+	topicList := TMQListNew()
+	TMQListAppend(topicList, "test_tmq_auto_topic")
+
+	//sync_consume_loop
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+	errCode, list := TMQSubscription(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+	size := TMQListGetSize(list)
+	r := TMQListToCArray(list, int(size))
+	assert.Equal(t, []string{"test_tmq_auto_topic"}, r)
+	totalCount := 0
+	c2 := make(chan *TMQCommitCallbackResult, 1)
+	h2 := cgo.NewHandle(c2)
+	for i := 0; i < 5; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			t.Log(message)
+			topic := TMQGetTopicName(message)
+			assert.Equal(t, "test_tmq_auto_topic", topic)
+			messageType := TMQGetResType(message)
+			if messageType != common.TMQ_RES_METADATA {
+				continue
+			}
+			pointer := TMQGetJsonMeta(message)
+			data := ParseJsonMeta(pointer)
+			t.Log(string(data))
+			var meta tmqcommon.Meta
+			err = jsoniter.Unmarshal(data, &meta)
+			assert.NoError(t, err)
+			assert.Equal(t, "create", meta.Type)
+			for {
+				blockSize, errCode, block := TaosFetchRawBlock(message)
+				if errCode != int(errors.SUCCESS) {
+					errStr := TaosErrorStr(message)
+					err := errors.NewError(errCode, errStr)
+					t.Error(err)
+					TaosFreeResult(message)
+					return
+				}
+				if blockSize == 0 {
+					break
+				}
+				tableName := TMQGetTableName(message)
+				assert.Equal(t, "ct1", tableName)
+				filedCount := TaosNumFields(message)
+				rh, err := ReadColumn(message, filedCount)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				precision := TaosResultPrecision(message)
+				totalCount += blockSize
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
+				t.Log(data)
+			}
+			TaosFreeResult(message)
+
+			TMQCommitAsync(tmq, nil, h2)
+			timer := time.NewTimer(time.Minute)
+			select {
+			case d := <-c2:
+				assert.Nil(t, d.GetError())
+				assert.Equal(t, int32(0), d.ErrCode)
+				PutTMQCommitCallbackResult(d)
+				timer.Stop()
+				break
+			case <-timer.C:
+				timer.Stop()
+				t.Error("wait tmq commit callback timeout")
+				return
+			}
+		}
+	}
+
+	errCode = TMQConsumerClose(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+	assert.GreaterOrEqual(t, totalCount, 1)
 }

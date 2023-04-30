@@ -4,7 +4,7 @@ package wrapper
 #cgo CFLAGS: -IC:/TDengine/include -I/usr/include
 #cgo linux LDFLAGS: -L/usr/lib -ltaos
 #cgo windows LDFLAGS: -LC:/TDengine/driver -ltaos
-#cgo darwin LDFLAGS: -L/usr/local/taos/driver -ltaos
+#cgo darwin LDFLAGS: -L/usr/local/lib -ltaos
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +20,9 @@ void taos_fetch_rows_a_wrapper(TAOS_RES *res, void *param){
 };
 void taos_query_a_wrapper(TAOS *taos,const char *sql, void *param){
 	return taos_query_a(taos,sql,QueryCallback,param);
+};
+void taos_query_a_with_req_id_wrapper(TAOS *taos,const char *sql, void *param, int64_t reqID){
+	return taos_query_a_with_reqid(taos, sql, QueryCallback, param, reqID);
 };
 void taos_fetch_raw_block_a_wrapper(TAOS_RES *res, void *param){
 	return taos_fetch_raw_block_a(res,FetchRawBlockCallback,param);
@@ -76,6 +79,13 @@ func TaosQuery(taosConnect unsafe.Pointer, sql string) unsafe.Pointer {
 	cSql := C.CString(sql)
 	defer C.free(unsafe.Pointer(cSql))
 	return unsafe.Pointer(C.taos_query(taosConnect, cSql))
+}
+
+// TasoQueryWithReqID TAOS_RES *taos_query_with_reqid(TAOS *taos, const char *sql, int64_t reqID);
+func TasoQueryWithReqID(taosConn unsafe.Pointer, sql string, reqID int64) unsafe.Pointer {
+	cSql := C.CString(sql)
+	defer C.free(unsafe.Pointer(cSql))
+	return unsafe.Pointer(C.taos_query_with_reqid(taosConn, cSql, (C.int64_t)(reqID)))
 }
 
 // TaosError int taos_errno(TAOS_RES *tres);
@@ -144,12 +154,19 @@ func TaosOptions(option int, value string) int {
 func TaosQueryA(taosConnect unsafe.Pointer, sql string, caller cgo.Handle) {
 	cSql := C.CString(sql)
 	defer C.free(unsafe.Pointer(cSql))
-	C.taos_query_a_wrapper(taosConnect, cSql, unsafe.Pointer(caller))
+	C.taos_query_a_wrapper(taosConnect, cSql, caller.Pointer())
+}
+
+// TaosQueryAWithReqID void taos_query_a_with_reqid(TAOS *taos, const char *sql, __taos_async_fn_t fp, void *param, int64_t reqid);
+func TaosQueryAWithReqID(taosConn unsafe.Pointer, sql string, caller cgo.Handle, reqID int64) {
+	cSql := C.CString(sql)
+	defer C.free(unsafe.Pointer(cSql))
+	C.taos_query_a_with_req_id_wrapper(taosConn, cSql, caller.Pointer(), (C.int64_t)(reqID))
 }
 
 // TaosFetchRowsA void taos_fetch_rows_a(TAOS_RES *res, void (*fp)(void *param, TAOS_RES *, int numOfRows), void *param);
 func TaosFetchRowsA(res unsafe.Pointer, caller cgo.Handle) {
-	C.taos_fetch_rows_a_wrapper(res, unsafe.Pointer(caller))
+	C.taos_fetch_rows_a_wrapper(res, caller.Pointer())
 }
 
 // TaosResetCurrentDB void taos_reset_current_db(TAOS *taos);
@@ -176,7 +193,7 @@ func TaosFetchLengths(res unsafe.Pointer) unsafe.Pointer {
 
 // TaosFetchRawBlockA void        taos_fetch_raw_block_a(TAOS_RES* res, __taos_async_fn_t fp, void* param);
 func TaosFetchRawBlockA(res unsafe.Pointer, caller cgo.Handle) {
-	C.taos_fetch_raw_block_a_wrapper(res, unsafe.Pointer(caller))
+	C.taos_fetch_raw_block_a_wrapper(res, caller.Pointer())
 }
 
 // TaosGetRawBlock const void *taos_get_raw_block(TAOS_RES* res);
@@ -195,4 +212,46 @@ func TaosLoadTableInfo(taosConnect unsafe.Pointer, tableNameList []string) int {
 	buf := C.CString(s)
 	defer C.free(unsafe.Pointer(buf))
 	return int(C.taos_load_table_info(taosConnect, buf))
+}
+
+// TaosGetTableVgID
+// DLL_EXPORT int taos_get_table_vgId(TAOS *taos, const char *db, const char *table, int *vgId)
+func TaosGetTableVgID(conn unsafe.Pointer, db, table string) (vgID int, code int) {
+	cDB := C.CString(db)
+	defer C.free(unsafe.Pointer(cDB))
+	cTable := C.CString(table)
+	defer C.free(unsafe.Pointer(cTable))
+
+	code = int(C.taos_get_table_vgId(conn, cDB, cTable, (*C.int)(unsafe.Pointer(&vgID))))
+	return
+}
+
+// TaosGetTablesVgID DLL_EXPORT int taos_get_tables_vgId(TAOS *taos, const char *db, const char *table[], int tableNum, int *vgId)
+func TaosGetTablesVgID(conn unsafe.Pointer, db string, tables []string) (vgIDs []int, code int) {
+	cDB := C.CString(db)
+	defer C.free(unsafe.Pointer(cDB))
+	numTables := len(tables)
+	cTables := make([]*C.char, numTables)
+	needFree := make([]unsafe.Pointer, numTables)
+	defer func() {
+		for _, p := range needFree {
+			C.free(p)
+		}
+	}()
+	for i, table := range tables {
+		cTable := C.CString(table)
+		needFree[i] = unsafe.Pointer(cTable)
+		cTables[i] = cTable
+	}
+	p := C.malloc(C.sizeof_int * C.size_t(numTables))
+	defer C.free(p)
+	code = int(C.taos_get_tables_vgId(conn, cDB, (**C.char)(&cTables[0]), (C.int)(numTables), (*C.int)(p)))
+	if code != 0 {
+		return nil, code
+	}
+	vgIDs = make([]int, numTables)
+	for i := 0; i < numTables; i++ {
+		vgIDs[i] = int(*(*C.int)(unsafe.Pointer(uintptr(p) + uintptr(C.sizeof_int*C.int(i)))))
+	}
+	return
 }

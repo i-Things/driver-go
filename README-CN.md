@@ -4,7 +4,7 @@
 
 [English](README.md) | 简体中文
 
-[TDengine]提供了 GO 驱动程序 [`taosSql`][driver-go]，实现了 GO 语言的内置数据库操作接口 `database/sql/driver`。
+[TDengine] 提供了 GO 驱动程序 [`taosSql`][driver-go]，实现了 GO 语言的内置数据库操作接口 `database/sql/driver`。
 
 ## 提示
 
@@ -13,6 +13,10 @@ v2 与 v3 版本不兼容，与 TDengine 版本对应如下：
 | **driver-go 版本** | **TDengine 版本** |
 |------------------|-----------------|
 | v3.0.0           | 3.0.0.0+        |
+| v3.0.1           | 3.0.0.0+        |
+| v3.0.3           | 3.0.1.5+        |
+| v3.0.4           | 3.0.2.2+        |
+| v3.1.0           | 3.0.2.2+        |
 
 ## 安装
 
@@ -126,31 +130,31 @@ func main() {
 创建消费：
 
 ```go
-func NewConsumer(conf *Config) (*Consumer, error)
+func NewConsumer(conf *tmq.ConfigMap) (*Consumer, error)
+```
+
+订阅单个主题：
+
+```go
+func (c *Consumer) Subscribe(topic string, rebalanceCb RebalanceCb) error
 ```
 
 订阅：
 
 ```go
-func (c *Consumer) Subscribe(topics []string) error
+func (c *Consumer) SubscribeTopics(topics []string, rebalanceCb RebalanceCb) error
 ```
 
 轮询消息：
 
 ```go
-func (c *Consumer) Poll(timeout time.Duration) (*Result, error)
+func (c *Consumer) Poll(timeoutMs int) tmq.Event
 ```
 
 提交消息：
 
 ```go
-func (c *Consumer) Commit(ctx context.Context, message unsafe.Pointer) error
-```
-
-释放消息：
-
-```go
-func (c *Consumer) FreeMessage(message unsafe.Pointer)
+func (c *Consumer) Commit() ([]tmq.TopicPartition, error)
 ```
 
 取消订阅：
@@ -318,7 +322,9 @@ import (
 
 DSN 格式为：
 
-```数据库用户名:数据库密码@连接方式(域名或ip:端口)/[数据库][?参数]```
+```text
+数据库用户名:数据库密码@连接方式(域名或 ip:端口)/[数据库][?参数]
+```
 
 样例：
 
@@ -383,6 +389,242 @@ func main() {
 }
 ```
 
+## websocket 实现 `database/sql` 标准接口
+
+通过 websocket 方式实现 `database/sql` 接口，使用方法简单示例如下：
+
+```go
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    "time"
+
+    _ "github.com/taosdata/driver-go/v3/taosWS"
+)
+
+func main() {
+    var taosDSN = "root:taosdata@ws(localhost:6041)/"
+    taos, err := sql.Open("taosWS", taosDSN)
+    if err != nil {
+        fmt.Println("failed to connect TDengine, err:", err)
+        return
+    }
+    defer taos.Close()
+    taos.Exec("create database if not exists test")
+    taos.Exec("create table if not exists test.tb1 (ts timestamp, a int)")
+    _, err = taos.Exec("insert into test.tb1 values(now, 0)(now+1s,1)(now+2s,2)(now+3s,3)")
+    if err != nil {
+        fmt.Println("failed to insert, err:", err)
+        return
+    }
+    rows, err := taos.Query("select * from test.tb1")
+    if err != nil {
+        fmt.Println("failed to select from table, err:", err)
+        return
+    }
+
+    defer rows.Close()
+    for rows.Next() {
+        var r struct {
+            ts time.Time
+            a  int
+        }
+        err := rows.Scan(&r.ts, &r.a)
+        if err != nil {
+            fmt.Println("scan error:\n", err)
+            return
+        }
+        fmt.Println(r.ts, r.a)
+    }
+}
+```
+
+### 使用
+
+引入
+
+```go
+import (
+    "database/sql"
+    _ "github.com/taosdata/driver-go/v3/taosWS"
+)
+```
+
+`sql.Open` 的 driverName 为 `taosWS`
+
+DSN 格式为：
+
+```text
+数据库用户名:数据库密码@连接方式(域名或 ip:端口)/[数据库][?参数]
+```
+
+样例：
+
+```root:taosdata@ws(localhost:6041)/test?writeTimeout=10s&readTimeout=10m```
+
+参数：
+
+- `writeTimeout` 通过 websocket 发送数据的超时时间。
+- `readTimeout` 通过 websocket 接收响应数据的超时时间。
+
+## 通过 websocket 使用 tmq
+
+通过 websocket 方式使用 tmq。服务端需要启动 taoAdapter。
+
+### 配置相关 API
+
+- `func NewConfig(url string, chanLength uint) *Config`
+
+ 创建配置项，传入 websocket 地址和发送管道长度。
+
+- `func (c *Config) SetConnectUser(user string) error`
+
+ 设置用户名。
+
+- `func (c *Config) SetConnectPass(pass string) error`
+
+ 设置密码。
+
+- `func (c *Config) SetClientID(clientID string) error`
+
+ 设置客户端标识。
+
+- `func (c *Config) SetGroupID(groupID string) error`
+
+ 设置订阅组 ID。
+
+- `func (c *Config) SetWriteWait(writeWait time.Duration) error`
+
+ 设置发送消息等待时间。
+
+- `func (c *Config) SetMessageTimeout(timeout time.Duration) error`
+
+ 设置消息超时时间。
+
+- `func (c *Config) SetErrorHandler(f func(consumer *Consumer, err error))`
+
+ 设置错误处理方法。
+
+- `func (c *Config) SetCloseHandler(f func())`
+
+ 设置关闭处理方法。
+
+### 订阅相关 API
+
+- `func NewConsumer(conf *tmq.ConfigMap) (*Consumer, error)`
+
+ 创建消费者。
+
+- `func (c *Consumer) Subscribe(topic string, rebalanceCb RebalanceCb) error`
+
+ 订阅单个主题。
+
+- `func (c *Consumer) SubscribeTopics(topics []string, rebalanceCb RebalanceCb) error`
+
+ 订阅主题。
+
+- `func (c *Consumer) Poll(timeoutMs int) tmq.Event`
+
+ 轮询消息。
+
+- `func (c *Consumer) Commit() ([]tmq.TopicPartition, error)`
+
+ 提交消息。
+
+- `func (c *Consumer) Close() error`
+
+ 关闭连接。
+
+示例代码：[`examples/tmqoverws/main.go`](examples/tmqoverws/main.go)。
+
+## 通过 WebSocket 进行参数绑定
+
+通过 websocket 方式使用 stmt。服务端需要启动 taoAdapter。
+
+### 配置相关 API
+
+- `func NewConfig(url string, chanLength uint) *Config`
+
+  创建配置项，传入 websocket 地址和发送管道长度。
+
+- `func (c *Config) SetCloseHandler(f func())`
+
+  设置关闭处理方法。
+
+- `func (c *Config) SetConnectDB(db string) error`
+
+  设置连接 DB。
+
+- `func (c *Config) SetConnectPass(pass string) error`
+
+  设置连接密码。
+
+- `func (c *Config) SetConnectUser(user string) error`
+
+  设置连接用户名。
+
+- `func (c *Config) SetErrorHandler(f func(connector *Connector, err error))`
+
+  设置错误处理函数。
+
+- `func (c *Config) SetMessageTimeout(timeout time.Duration) error`
+
+  设置消息超时时间。
+
+- `func (c *Config) SetWriteWait(writeWait time.Duration) error`
+
+  设置发送消息等待时间。
+
+### 参数绑定相关 API
+
+* `func NewConnector(config *Config) (*Connector, error)`
+
+  创建连接。
+
+* `func (c *Connector) Init() (*Stmt, error)`
+
+  初始化参数。
+
+* `func (c *Connector) Close() error`
+
+  关闭连接。
+
+* `func (s *Stmt) Prepare(sql string) error`
+
+  参数绑定预处理 SQL 语句。
+
+* `func (s *Stmt) SetTableName(name string) error`
+
+  参数绑定设置表名。
+
+* `func (s *Stmt) SetTags(tags *param.Param, bindType *param.ColumnType) error`
+
+  参数绑定设置标签。
+
+* `func (s *Stmt) BindParam(params []*param.Param, bindType *param.ColumnType) error`
+
+  参数绑定多行数据。
+
+* `func (s *Stmt) AddBatch() error`
+
+  添加到参数绑定批处理。
+
+* `func (s *Stmt) Exec() error`
+
+  执行参数绑定。
+
+* `func (s *Stmt) GetAffectedRows() int`
+
+  获取参数绑定插入受影响行数。
+
+* `func (s *Stmt) Close() error`
+
+  结束参数绑定。
+
+完整参数绑定示例参见 [GitHub 示例文件](examples/stmtoverws/main.go)
+
 ## 目录结构
 
 ```text
@@ -391,10 +633,11 @@ driver-go
 ├── common //通用方法以及常量
 ├── errors //错误类型
 ├── examples //样例
-├── taosRestful // 数据库操作标准接口(restful)
+├── taosRestful // 数据库操作标准接口 (restful)
 ├── taosSql // 数据库操作标准接口
 ├── types // 内置类型
-└── wrapper // cgo 包装器
+├── wrapper // cgo 包装器
+└── ws // websocket
 ```
 
 ## 导航

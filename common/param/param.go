@@ -32,7 +32,6 @@ func (p *Param) SetNull(offset int) {
 		return
 	}
 	p.value[offset] = nil
-	return
 }
 
 func (p *Param) SetTinyint(offset int, value int) {
@@ -285,4 +284,13 @@ func (p *Param) AddJson(value []byte) *Param {
 
 func (p *Param) GetValues() []driver.Value {
 	return p.value
+}
+
+func (p *Param) AddValue(value interface{}) *Param {
+	if p.offset >= p.size {
+		return p
+	}
+	p.value[p.offset] = value
+	p.offset += 1
+	return p
 }

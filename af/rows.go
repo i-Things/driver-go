@@ -8,6 +8,7 @@ import (
 
 	"github.com/taosdata/driver-go/v3/af/async"
 	"github.com/taosdata/driver-go/v3/af/locker"
+	"github.com/taosdata/driver-go/v3/common/parser"
 	"github.com/taosdata/driver-go/v3/errors"
 	"github.com/taosdata/driver-go/v3/wrapper"
 	"github.com/taosdata/driver-go/v3/wrapper/handler"
@@ -56,7 +57,9 @@ func (rs *rows) Next(dest []driver.Value) error {
 	}
 
 	if rs.block == nil {
-		rs.taosFetchBlock()
+		if err := rs.taosFetchBlock(); err != nil {
+			return err
+		}
 	}
 	if rs.blockSize == 0 {
 		rs.block = nil
@@ -65,14 +68,16 @@ func (rs *rows) Next(dest []driver.Value) error {
 	}
 
 	if rs.blockOffset >= rs.blockSize {
-		rs.taosFetchBlock()
+		if err := rs.taosFetchBlock(); err != nil {
+			return err
+		}
 	}
 	if rs.blockSize == 0 {
 		rs.block = nil
 		rs.freeResult()
 		return io.EOF
 	}
-	wrapper.ReadRow(dest, rs.block, rs.blockSize, rs.blockOffset, rs.rowsHeader.ColTypes, rs.precision)
+	parser.ReadRow(dest, rs.block, rs.blockSize, rs.blockOffset, rs.rowsHeader.ColTypes, rs.precision)
 	rs.blockOffset++
 	return nil
 }
@@ -111,7 +116,9 @@ func (rs *rows) freeResult() {
 		locker.Unlock()
 		rs.result = nil
 	}
+
 	if rs.handler != nil {
 		async.PutHandler(rs.handler)
+		rs.handler = nil
 	}
 }

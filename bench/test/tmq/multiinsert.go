@@ -7,17 +7,21 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/taosdata/driver-go/v3/common/parser"
 	"github.com/taosdata/driver-go/v3/errors"
 	"github.com/taosdata/driver-go/v3/wrapper"
 	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
 
 func main() {
-	go http.ListenAndServe(":6060", nil)
+	go func() {
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			panic(err)
+		}
+	}()
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	result := wrapper.TaosQuery(conn, "create database if not exists tmq_test_db_multi_insert vgroups 2")
@@ -26,7 +30,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 
@@ -36,7 +39,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 
@@ -46,7 +48,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 
@@ -56,7 +57,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 
@@ -66,7 +66,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 
@@ -77,7 +76,6 @@ func main() {
 		errStr := wrapper.TaosErrorStr(result)
 		wrapper.TaosFreeResult(result)
 		panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-		return
 	}
 	wrapper.TaosFreeResult(result)
 	go func() {
@@ -88,7 +86,6 @@ func main() {
 				errStr := wrapper.TaosErrorStr(result)
 				wrapper.TaosFreeResult(result)
 				panic(errors.TaosError{Code: int32(code), ErrStr: errStr})
-				return
 			}
 			wrapper.TaosFreeResult(result)
 		}
@@ -103,11 +100,8 @@ func main() {
 	h := cgo.NewHandle(c)
 	wrapper.TMQConfSetAutoCommitCB(conf, h)
 	go func() {
-		for {
-			select {
-			case r := <-c:
-				wrapper.PutTMQCommitCallbackResult(r)
-			}
+		for r := range c {
+			wrapper.PutTMQCommitCallbackResult(r)
 		}
 	}()
 	tmq, err := wrapper.TMQConsumerNew(conf)
@@ -124,7 +118,6 @@ func main() {
 	if errCode != 0 {
 		errStr := wrapper.TMQErr2Str(errCode)
 		panic(errors.NewError(int(errCode), errStr))
-		return
 	}
 	totalCount := 0
 	c2 := make(chan *wrapper.TMQCommitCallbackResult, 1)
@@ -141,7 +134,6 @@ func main() {
 					err := errors.NewError(errCode, errStr)
 					wrapper.TaosFreeResult(message)
 					panic(err)
-					return
 				}
 				if blockSize == 0 {
 					break
@@ -152,11 +144,10 @@ func main() {
 				rh, err := wrapper.ReadColumn(message, filedCount)
 				if err != nil {
 					panic(err)
-					return
 				}
 				precision := wrapper.TaosResultPrecision(message)
 				totalCount += blockSize
-				data := wrapper.ReadBlock(block, blockSize, rh.ColTypes, precision)
+				data := parser.ReadBlock(block, blockSize, rh.ColTypes, precision)
 				fmt.Println(data)
 			}
 			wrapper.TaosFreeResult(message)
@@ -171,7 +162,6 @@ func main() {
 			case <-timer.C:
 				timer.Stop()
 				panic("wait tmq commit callback timeout")
-				return
 			}
 		}
 		table = table[:0]

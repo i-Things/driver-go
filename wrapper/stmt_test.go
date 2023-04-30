@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/taosdata/driver-go/v3/common"
 	"github.com/taosdata/driver-go/v3/common/param"
+	"github.com/taosdata/driver-go/v3/common/parser"
 	taosError "github.com/taosdata/driver-go/v3/errors"
 	taosTypes "github.com/taosdata/driver-go/v3/types"
 )
@@ -628,7 +629,7 @@ func query(conn unsafe.Pointer, sql string) ([][]driver.Value, error) {
 		if columns == 0 {
 			break
 		}
-		r := ReadBlock(block, columns, rh.ColTypes, precision)
+		r := parser.ReadBlock(block, columns, rh.ColTypes, precision)
 		result = append(result, r...)
 	}
 	return result, nil
@@ -677,7 +678,7 @@ func StmtQuery(t *testing.T, conn unsafe.Pointer, sql string, params *param.Para
 		if blockSize == 0 {
 			break
 		}
-		d := ReadBlock(block, blockSize, rowsHeader.ColTypes, precision)
+		d := parser.ReadBlock(block, blockSize, rowsHeader.ColTypes, precision)
 		data = append(data, d...)
 	}
 	TaosFreeResult(res)
@@ -759,6 +760,7 @@ func TestGetFields(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	defer TaosStmtReclaimFields(stmt, tagsP)
 	code, columnCount, columnsP := TaosStmtGetColFields(stmt)
 	if code != 0 {
 		errStr := TaosStmtErrStr(stmt)
@@ -766,6 +768,7 @@ func TestGetFields(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	defer TaosStmtReclaimFields(stmt, columnsP)
 	columns := StmtParseFields(columnCount, columnsP)
 	tags := StmtParseFields(tagCount, tagsP)
 	assert.Equal(t, []*StmtField{
@@ -858,6 +861,7 @@ func TestGetFieldsCommonTable(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	defer TaosStmtReclaimFields(stmt, columnsP)
 	columns := StmtParseFields(columnCount, columnsP)
 	assert.Equal(t, []*StmtField{
 		{"ts", 9, 0, 0, 8},
@@ -932,6 +936,7 @@ func TestTaosStmtSetTags(t *testing.T) {
 	stmt := TaosStmtInit(conn)
 	if stmt == nil {
 		err = taosError.NewError(0xffff, "failed to init stmt")
+		t.Error(err)
 		return
 	}
 	//defer TaosStmtClose(stmt)

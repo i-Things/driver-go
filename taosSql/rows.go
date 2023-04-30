@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"unsafe"
 
+	"github.com/taosdata/driver-go/v3/common/parser"
 	"github.com/taosdata/driver-go/v3/errors"
 	"github.com/taosdata/driver-go/v3/wrapper"
 	"github.com/taosdata/driver-go/v3/wrapper/handler"
@@ -75,7 +76,7 @@ func (rs *rows) Next(dest []driver.Value) error {
 		rs.block = nil
 		return io.EOF
 	}
-	wrapper.ReadRow(dest, rs.block, rs.blockSize, rs.blockOffset, rs.rowsHeader.ColTypes, rs.precision)
+	parser.ReadRow(dest, rs.block, rs.blockSize, rs.blockOffset, rs.rowsHeader.ColTypes, rs.precision)
 	rs.blockOffset++
 	return nil
 }
@@ -108,7 +109,10 @@ func (rs *rows) asyncFetchRows() *handler.AsyncResult {
 }
 
 func (rs *rows) freeResult() {
-	asyncHandlerPool.Put(rs.handler)
+	if rs.handler != nil {
+		asyncHandlerPool.Put(rs.handler)
+		rs.handler = nil
+	}
 	if rs.result != nil {
 		locker.Lock()
 		wrapper.TaosFreeResult(rs.result)
