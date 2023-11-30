@@ -36,7 +36,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if c.cfg.writeTimeout == 0 {
 		c.cfg.writeTimeout = common.DefaultWriteWait
 	}
-	tc, err := newTaosConn(c.cfg)
+	tc, err := newTaosConn(ctx, c.cfg)
 	return tc, err
 }
 

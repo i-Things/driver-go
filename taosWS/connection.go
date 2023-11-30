@@ -59,7 +59,7 @@ func (tc *taosConn) generateReqID() uint64 {
 	return atomic.AddUint64(&tc.requestID, 1)
 }
 
-func newTaosConn(cfg *config) (*taosConn, error) {
+func newTaosConn(ctx context.Context, cfg *config) (*taosConn, error) {
 	endpointUrl := &url.URL{
 		Scheme: cfg.net,
 		Host:   fmt.Sprintf("%s:%d", cfg.addr, cfg.port),
@@ -91,7 +91,9 @@ func newTaosConn(cfg *config) (*taosConn, error) {
 
 	err = tc.connect()
 	if err != nil {
+		logx.WithContext(ctx).Errorf("websocket 连接失败,err:%v", err)
 		tc.Close()
+		return nil, err
 	}
 	return tc, nil
 }
