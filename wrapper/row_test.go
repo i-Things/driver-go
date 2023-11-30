@@ -22,7 +22,7 @@ func TestFetchRowJSON(t *testing.T) {
 
 	defer TaosClose(conn)
 	defer func() {
-		res := TaosQuery(conn, "drop database if exists test_json")
+		res := TaosQuery(conn, "drop database if exists test_json_wrapper")
 		code := TaosError(res)
 		if code != 0 {
 			errStr := TaosErrorStr(res)
@@ -32,7 +32,7 @@ func TestFetchRowJSON(t *testing.T) {
 		}
 		TaosFreeResult(res)
 	}()
-	res := TaosQuery(conn, "create database if not exists test_json")
+	res := TaosQuery(conn, "create database if not exists test_json_wrapper")
 	code := TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -42,7 +42,7 @@ func TestFetchRowJSON(t *testing.T) {
 	}
 	TaosFreeResult(res)
 	defer func() {
-		res := TaosQuery(conn, "drop database if exists test_json")
+		res := TaosQuery(conn, "drop database if exists test_json_wrapper")
 		code := TaosError(res)
 		if code != 0 {
 			errStr := TaosErrorStr(res)
@@ -55,7 +55,7 @@ func TestFetchRowJSON(t *testing.T) {
 		}
 		TaosFreeResult(res)
 	}()
-	res = TaosQuery(conn, "drop table if exists test_json.tjsonr")
+	res = TaosQuery(conn, "drop table if exists test_json_wrapper.tjsonr")
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -67,7 +67,7 @@ func TestFetchRowJSON(t *testing.T) {
 		return
 	}
 	TaosFreeResult(res)
-	res = TaosQuery(conn, "create stable if not exists test_json.tjsonr(ts timestamp,v int )tags(t json)")
+	res = TaosQuery(conn, "create stable if not exists test_json_wrapper.tjsonr(ts timestamp,v int )tags(t json)")
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -79,7 +79,7 @@ func TestFetchRowJSON(t *testing.T) {
 		return
 	}
 	TaosFreeResult(res)
-	res = TaosQuery(conn, `insert into test_json.tjr_1 using test_json.tjsonr tags('{"a":1,"b":"b"}')values (now,1)`)
+	res = TaosQuery(conn, `insert into test_json_wrapper.tjr_1 using test_json_wrapper.tjsonr tags('{"a":1,"b":"b"}')values (now,1)`)
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -91,7 +91,7 @@ func TestFetchRowJSON(t *testing.T) {
 		return
 	}
 	TaosFreeResult(res)
-	res = TaosQuery(conn, `insert into test_json.tjr_2 using test_json.tjsonr tags('{"a":1,"c":"c"}')values (now+1s,1)`)
+	res = TaosQuery(conn, `insert into test_json_wrapper.tjr_2 using test_json_wrapper.tjsonr tags('{"a":1,"c":"c"}')values (now+1s,1)`)
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -103,7 +103,7 @@ func TestFetchRowJSON(t *testing.T) {
 		return
 	}
 	TaosFreeResult(res)
-	res = TaosQuery(conn, `insert into test_json.tjr_3 using test_json.tjsonr tags('null')values (now+2s,1)`)
+	res = TaosQuery(conn, `insert into test_json_wrapper.tjr_3 using test_json_wrapper.tjsonr tags('null')values (now+2s,1)`)
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -116,7 +116,7 @@ func TestFetchRowJSON(t *testing.T) {
 	}
 	TaosFreeResult(res)
 
-	res = TaosQuery(conn, `select * from test_json.tjsonr order by ts`)
+	res = TaosQuery(conn, `select * from test_json_wrapper.tjsonr order by ts`)
 	code = TaosError(res)
 	if code != 0 {
 		errStr := TaosErrorStr(res)
@@ -482,6 +482,9 @@ func TestFetchRowNchar(t *testing.T) {
 	assert.Empty(t, names)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:28
+// @description: test fetch row all type
 func TestFetchRowAllType(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -536,7 +539,9 @@ func TestFetchRowAllType(t *testing.T) {
 			"c10 float,"+
 			"c11 double,"+
 			"c12 binary(20),"+
-			"c13 nchar(20)"+
+			"c13 nchar(20),"+
+			"c14 varbinary(20),"+
+			"c15 geometry(100)"+
 			")"+
 			"tags(t json)", db))
 	code = TaosError(res)
@@ -560,7 +565,7 @@ func TestFetchRowAllType(t *testing.T) {
 	}
 	TaosFreeResult(res)
 	now := time.Now()
-	res = TaosQuery(conn, fmt.Sprintf("insert into %s.tb1 values('%s',true,2,3,4,5,6,7,8,9,10,11,'binary','nchar');", db, now.Format(time.RFC3339Nano)))
+	res = TaosQuery(conn, fmt.Sprintf("insert into %s.tb1 values('%s',true,2,3,4,5,6,7,8,9,10,11,'binary','nchar','varbinary','POINT(100 100)');", db, now.Format(time.RFC3339Nano)))
 	code = TaosError(res)
 	if code != int(errors.SUCCESS) {
 		errStr := TaosErrorStr(res)
@@ -617,5 +622,7 @@ func TestFetchRowAllType(t *testing.T) {
 	assert.Equal(t, float64(11), result[11].(float64))
 	assert.Equal(t, "binary", result[12].(string))
 	assert.Equal(t, "nchar", result[13].(string))
-	assert.Equal(t, []byte(`{"a":1}`), result[14].([]byte))
+	assert.Equal(t, []byte("varbinary"), result[14].([]byte))
+	assert.Equal(t, []byte{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40}, result[15].([]byte))
+	assert.Equal(t, []byte(`{"a":1}`), result[16].([]byte))
 }

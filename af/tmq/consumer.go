@@ -94,6 +94,8 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 	topic := wrapper.TMQGetTopicName(message)
 	db := wrapper.TMQGetDBName(message)
 	resultType := wrapper.TMQGetResType(message)
+	offset := tmq.Offset(wrapper.TMQGetVgroupOffset(message))
+	vgID := wrapper.TMQGetVgroupID(message)
 	switch resultType {
 	case common.TMQ_RES_DATA:
 		result := &tmq.DataMessage{}
@@ -104,6 +106,12 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 			return tmq.NewTMQErrorWithErr(err)
 		}
 		result.SetData(data)
+		result.SetOffset(offset)
+		result.TopicPartition = tmq.TopicPartition{
+			Topic:     &topic,
+			Partition: vgID,
+			Offset:    offset,
+		}
 		wrapper.TaosFreeResult(message)
 		return result
 	case common.TMQ_RES_TABLE_META:
@@ -115,12 +123,19 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 			return tmq.NewTMQErrorWithErr(err)
 		}
 		result.SetMeta(meta)
+		result.SetOffset(offset)
+		result.TopicPartition = tmq.TopicPartition{
+			Topic:     &topic,
+			Partition: vgID,
+			Offset:    offset,
+		}
 		wrapper.TaosFreeResult(message)
 		return result
 	case common.TMQ_RES_METADATA:
 		result := &tmq.MetaDataMessage{}
 		result.SetDbName(db)
 		result.SetTopic(topic)
+		result.SetOffset(offset)
 		data, err := c.getData(message)
 		if err != nil {
 			return tmq.NewTMQErrorWithErr(err)
@@ -133,6 +148,11 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 			Meta: meta,
 			Data: data,
 		})
+		result.TopicPartition = tmq.TopicPartition{
+			Topic:     &topic,
+			Partition: vgID,
+			Offset:    offset,
+		}
 		wrapper.TaosFreeResult(message)
 		return result
 	default:
@@ -183,7 +203,16 @@ func (c *Consumer) getData(message unsafe.Pointer) ([]*tmq.Data, error) {
 }
 
 func (c *Consumer) Commit() ([]tmq.TopicPartition, error) {
-	return c.doCommit(nil)
+	errCode := wrapper.TMQCommitSync(c.cConsumer, nil)
+	if errCode != taosError.SUCCESS {
+		errStr := wrapper.TMQErr2Str(errCode)
+		return nil, taosError.NewError(int(errCode), errStr)
+	}
+	partitions, err := c.Assignment()
+	if err != nil {
+		return nil, err
+	}
+	return c.Committed(partitions, 0)
 }
 
 func (c *Consumer) doCommit(message unsafe.Pointer) ([]tmq.TopicPartition, error) {
@@ -193,6 +222,86 @@ func (c *Consumer) doCommit(message unsafe.Pointer) ([]tmq.TopicPartition, error
 		return nil, taosError.NewError(int(errCode), errStr)
 	}
 	return nil, nil
+}
+
+func (c *Consumer) Assignment() (partitions []tmq.TopicPartition, err error) {
+	errCode, list := wrapper.TMQSubscription(c.cConsumer)
+	if errCode != taosError.SUCCESS {
+		errStr := wrapper.TMQErr2Str(errCode)
+		return nil, taosError.NewError(int(errCode), errStr)
+	}
+	defer wrapper.TMQListDestroy(list)
+	size := wrapper.TMQListGetSize(list)
+	topics := wrapper.TMQListToCArray(list, int(size))
+	for _, topic := range topics {
+		errCode, assignment := wrapper.TMQGetTopicAssignment(c.cConsumer, topic)
+		if errCode != taosError.SUCCESS {
+			errStr := wrapper.TMQErr2Str(errCode)
+			return nil, taosError.NewError(int(errCode), errStr)
+		}
+		for i := 0; i < len(assignment); i++ {
+			topicName := topic
+			partitions = append(partitions, tmq.TopicPartition{
+				Topic:     &topicName,
+				Partition: assignment[i].VGroupID,
+				Offset:    tmq.Offset(assignment[i].Offset),
+			})
+		}
+	}
+	return partitions, nil
+}
+
+func (c *Consumer) Seek(partition tmq.TopicPartition, ignoredTimeoutMs int) error {
+	errCode := wrapper.TMQOffsetSeek(c.cConsumer, *partition.Topic, partition.Partition, int64(partition.Offset))
+	if errCode != taosError.SUCCESS {
+		errStr := wrapper.TMQErr2Str(errCode)
+		return taosError.NewError(int(errCode), errStr)
+	}
+	return nil
+}
+
+func (c *Consumer) Committed(partitions []tmq.TopicPartition, timeoutMs int) (offsets []tmq.TopicPartition, err error) {
+	offsets = make([]tmq.TopicPartition, len(partitions))
+	for i := 0; i < len(partitions); i++ {
+		cOffset := wrapper.TMQCommitted(c.cConsumer, *partitions[i].Topic, partitions[i].Partition)
+		offset := tmq.Offset(cOffset)
+		if !offset.Valid() {
+			return nil, taosError.NewError(int(offset), wrapper.TMQErr2Str(int32(offset)))
+		}
+		offsets[i] = tmq.TopicPartition{
+			Topic:     partitions[i].Topic,
+			Partition: partitions[i].Partition,
+			Offset:    offset,
+		}
+	}
+	return
+}
+
+func (c *Consumer) CommitOffsets(offsets []tmq.TopicPartition) ([]tmq.TopicPartition, error) {
+	for i := 0; i < len(offsets); i++ {
+		errCode := wrapper.TMQCommitOffsetSync(c.cConsumer, *offsets[i].Topic, offsets[i].Partition, int64(offsets[i].Offset))
+		if errCode != taosError.SUCCESS {
+			errStr := wrapper.TMQErr2Str(errCode)
+			return nil, taosError.NewError(int(errCode), errStr)
+		}
+	}
+	return c.Committed(offsets, 0)
+}
+
+func (c *Consumer) Position(partitions []tmq.TopicPartition) (offsets []tmq.TopicPartition, err error) {
+	offsets = make([]tmq.TopicPartition, len(partitions))
+	for i := 0; i < len(partitions); i++ {
+		position := wrapper.TMQPosition(c.cConsumer, *partitions[i].Topic, partitions[i].Partition)
+		if position < 0 {
+			return nil, taosError.NewError(int(position), wrapper.TMQErr2Str(int32(position)))
+		}
+		offsets[i] = tmq.TopicPartition{
+			Topic:     partitions[i].Topic,
+			Partition: partitions[i].Partition,
+			Offset:    tmq.Offset(position),
+		}
+	}
+	return
 }
 
 // Close release consumer

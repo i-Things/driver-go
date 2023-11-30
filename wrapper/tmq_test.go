@@ -15,6 +15,9 @@ import (
 	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
 
+// @author: xftan
+// @date: 2023/10/13 11:32
+// @description: test tmq
 func TestTMQ(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -145,6 +148,7 @@ func TestTMQ(t *testing.T) {
 	// auto commit default is true then the commitCallback function will be called after 5 seconds
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -244,6 +248,9 @@ func TestTMQ(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:33
+// @description: test TMQList
 func TestTMQList(t *testing.T) {
 	list := TMQListNew()
 	TMQListAppend(list, "1")
@@ -255,6 +262,9 @@ func TestTMQList(t *testing.T) {
 	TMQListDestroy(list)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:33
+// @description: test tmq subscribe db
 func TestTMQDB(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -374,6 +384,7 @@ func TestTMQDB(t *testing.T) {
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
 	TMQConfSet(conf, "msg.with.table.name", "true")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -470,6 +481,9 @@ func TestTMQDB(t *testing.T) {
 	assert.GreaterOrEqual(t, totalCount, 5)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:33
+// @description: test tmq subscribe multi tables
 func TestTMQDBMultiTable(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -598,6 +612,7 @@ func TestTMQDBMultiTable(t *testing.T) {
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
 	TMQConfSet(conf, "msg.with.table.name", "true")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -704,6 +719,9 @@ func TestTMQDBMultiTable(t *testing.T) {
 	assert.Emptyf(t, tables, "tables name not empty", tables)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:33
+// @description: test tmq subscribe db with multi table insert
 func TestTMQDBMultiInsert(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -722,7 +740,7 @@ func TestTMQDBMultiInsert(t *testing.T) {
 		}
 		TaosFreeResult(result)
 	}()
-	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi_insert vgroups 2 WAL_RETENTION_PERIOD 86400")
+	result := TaosQuery(conn, "create database if not exists tmq_test_db_multi_insert vgroups 2 wal_retention_period 3600")
 	code := TaosError(result)
 	if code != 0 {
 		errStr := TaosErrorStr(result)
@@ -810,6 +828,7 @@ func TestTMQDBMultiInsert(t *testing.T) {
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
 	TMQConfSet(conf, "msg.with.table.name", "true")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -909,6 +928,9 @@ func TestTMQDBMultiInsert(t *testing.T) {
 	t.Log(tables)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:34
+// @description: tmq test modify meta
 func TestTMQModify(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -956,7 +978,6 @@ func TestTMQModify(t *testing.T) {
 		return
 	}
 	TaosFreeResult(result)
-
 	result = TaosQuery(conn, "create database if not exists tmq_test_db_modify_target vgroups 2 WAL_RETENTION_PERIOD 86400")
 	code = TaosError(result)
 	if code != 0 {
@@ -1014,6 +1035,7 @@ func TestTMQModify(t *testing.T) {
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
 	TMQConfSet(conf, "msg.with.table.name", "true")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -1148,36 +1170,70 @@ func TestTMQModify(t *testing.T) {
 		}
 		d, err := query(targetConn, "describe stb")
 		assert.NoError(t, err)
-		assert.Equal(t, [][]driver.Value{
-			{"ts", "TIMESTAMP", int32(8), ""},
-			{"c1", "BOOL", int32(1), ""},
-			{"c2", "TINYINT", int32(1), ""},
-			{"c3", "SMALLINT", int32(2), ""},
-			{"c4", "INT", int32(4), ""},
-			{"c5", "BIGINT", int32(8), ""},
-			{"c6", "TINYINT UNSIGNED", int32(1), ""},
-			{"c7", "SMALLINT UNSIGNED", int32(2), ""},
-			{"c8", "INT UNSIGNED", int32(4), ""},
-			{"c9", "BIGINT UNSIGNED", int32(8), ""},
-			{"c10", "FLOAT", int32(4), ""},
-			{"c11", "DOUBLE", int32(8), ""},
-			{"c12", "VARCHAR", int32(20), ""},
-			{"c13", "NCHAR", int32(20), ""},
-			{"tts", "TIMESTAMP", int32(8), "TAG"},
-			{"tc1", "BOOL", int32(1), "TAG"},
-			{"tc2", "TINYINT", int32(1), "TAG"},
-			{"tc3", "SMALLINT", int32(2), "TAG"},
-			{"tc4", "INT", int32(4), "TAG"},
-			{"tc5", "BIGINT", int32(8), "TAG"},
-			{"tc6", "TINYINT UNSIGNED", int32(1), "TAG"},
-			{"tc7", "SMALLINT UNSIGNED", int32(2), "TAG"},
-			{"tc8", "INT UNSIGNED", int32(4), "TAG"},
-			{"tc9", "BIGINT UNSIGNED", int32(8), "TAG"},
-			{"tc10", "FLOAT", int32(4), "TAG"},
-			{"tc11", "DOUBLE", int32(8), "TAG"},
-			{"tc12", "VARCHAR", int32(20), "TAG"},
-			{"tc13", "NCHAR", int32(20), "TAG"},
-		}, d)
+		if len(d[0]) == 4 {
+			assert.Equal(t, [][]driver.Value{
+				{"ts", "TIMESTAMP", int32(8), ""},
+				{"c1", "BOOL", int32(1), ""},
+				{"c2", "TINYINT", int32(1), ""},
+				{"c3", "SMALLINT", int32(2), ""},
+				{"c4", "INT", int32(4), ""},
+				{"c5", "BIGINT", int32(8), ""},
+				{"c6", "TINYINT UNSIGNED", int32(1), ""},
+				{"c7", "SMALLINT UNSIGNED", int32(2), ""},
+				{"c8", "INT UNSIGNED", int32(4), ""},
+				{"c9", "BIGINT UNSIGNED", int32(8), ""},
+				{"c10", "FLOAT", int32(4), ""},
+				{"c11", "DOUBLE", int32(8), ""},
+				{"c12", "VARCHAR", int32(20), ""},
+				{"c13", "NCHAR", int32(20), ""},
+				{"tts", "TIMESTAMP", int32(8), "TAG"},
+				{"tc1", "BOOL", int32(1), "TAG"},
+				{"tc2", "TINYINT", int32(1), "TAG"},
+				{"tc3", "SMALLINT", int32(2), "TAG"},
+				{"tc4", "INT", int32(4), "TAG"},
+				{"tc5", "BIGINT", int32(8), "TAG"},
+				{"tc6", "TINYINT UNSIGNED", int32(1), "TAG"},
+				{"tc7", "SMALLINT UNSIGNED", int32(2), "TAG"},
+				{"tc8", "INT UNSIGNED", int32(4), "TAG"},
+				{"tc9", "BIGINT UNSIGNED", int32(8), "TAG"},
+				{"tc10", "FLOAT", int32(4), "TAG"},
+				{"tc11", "DOUBLE", int32(8), "TAG"},
+				{"tc12", "VARCHAR", int32(20), "TAG"},
+				{"tc13", "NCHAR", int32(20), "TAG"},
+			}, d)
+		} else {
+			assert.Equal(t, [][]driver.Value{
+				{"ts", "TIMESTAMP", int32(8), "", ""},
+				{"c1", "BOOL", int32(1), "", ""},
+				{"c2", "TINYINT", int32(1), "", ""},
+				{"c3", "SMALLINT", int32(2), "", ""},
+				{"c4", "INT", int32(4), "", ""},
+				{"c5", "BIGINT", int32(8), "", ""},
+				{"c6", "TINYINT UNSIGNED", int32(1), "", ""},
+				{"c7", "SMALLINT UNSIGNED", int32(2), "", ""},
+				{"c8", "INT UNSIGNED", int32(4), "", ""},
+				{"c9", "BIGINT UNSIGNED", int32(8), "", ""},
+				{"c10", "FLOAT", int32(4), "", ""},
+				{"c11", "DOUBLE", int32(8), "", ""},
+				{"c12", "VARCHAR", int32(20), "", ""},
+				{"c13", "NCHAR", int32(20), "", ""},
+				{"tts", "TIMESTAMP", int32(8), "TAG", ""},
+				{"tc1", "BOOL", int32(1), "TAG", ""},
+				{"tc2", "TINYINT", int32(1), "TAG", ""},
+				{"tc3", "SMALLINT", int32(2), "TAG", ""},
+				{"tc4", "INT", int32(4), "TAG", ""},
+				{"tc5", "BIGINT", int32(8), "TAG", ""},
+				{"tc6", "TINYINT UNSIGNED", int32(1), "TAG", ""},
+				{"tc7", "SMALLINT UNSIGNED", int32(2), "TAG", ""},
+				{"tc8", "INT UNSIGNED", int32(4), "TAG", ""},
+				{"tc9", "BIGINT UNSIGNED", int32(8), "TAG", ""},
+				{"tc10", "FLOAT", int32(4), "TAG", ""},
+				{"tc11", "DOUBLE", int32(8), "TAG", ""},
+				{"tc12", "VARCHAR", int32(20), "TAG", ""},
+				{"tc13", "NCHAR", int32(20), "TAG", ""},
+			}, d)
+		}
+
 	})
 
 	TMQUnsubscribe(tmq)
@@ -1189,6 +1245,9 @@ func TestTMQModify(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:34
+// @description: test tmq subscribe with auto create table
 func TestTMQAutoCreateTable(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -1273,6 +1332,7 @@ func TestTMQAutoCreateTable(t *testing.T) {
 	TMQConfSet(conf, "enable.auto.commit", "true")
 	TMQConfSet(conf, "group.id", "tg2")
 	TMQConfSet(conf, "msg.with.table.name", "true")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
 	c := make(chan *TMQCommitCallbackResult, 1)
 	h := cgo.NewHandle(c)
 	TMQConfSetAutoCommitCB(conf, h)
@@ -1378,4 +1438,605 @@ func TestTMQAutoCreateTable(t *testing.T) {
 		return
 	}
 	assert.GreaterOrEqual(t, totalCount, 1)
+}
+
+// @author: xftan
+// @date: 2023/10/13 11:35
+// @description: test tmq get assignment
+func TestTMQGetTopicAssignment(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer TaosClose(conn)
+
+	defer func() {
+		if err = taosOperation(conn, "drop database if exists test_tmq_get_topic_assignment"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err = taosOperation(conn, "create database if not exists test_tmq_get_topic_assignment vgroups 1 WAL_RETENTION_PERIOD 86400"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "use test_tmq_get_topic_assignment"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "create table if not exists t (ts timestamp,v int)"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// create topic
+	if err = taosOperation(conn, "create topic if not exists test_tmq_assignment as select * from t"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		if err = taosOperation(conn, "drop topic if exists test_tmq_assignment"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	conf := TMQConfNew()
+	defer TMQConfDestroy(conf)
+	TMQConfSet(conf, "group.id", "tg2")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer TMQConsumerClose(tmq)
+
+	topicList := TMQListNew()
+	TMQListAppend(topicList, "test_tmq_assignment")
+
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Fatal(errors.NewError(int(errCode), errStr))
+		return
+	}
+
+	code, assignment := TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.Equal(t, int64(0), assignment[0].Offset)
+	assert.GreaterOrEqual(t, assignment[0].End, assignment[0].Offset)
+	end := assignment[0].End
+	vgID, vgCode := TaosGetTableVgID(conn, "test_tmq_get_topic_assignment", "t")
+	if vgCode != 0 {
+		t.Fatal(errors.NewError(int(vgCode), TMQErr2Str(code)))
+	}
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+
+	_ = taosOperation(conn, "insert into t values(now,1)")
+	haveMessage := false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			TMQCommitSync(tmq, message)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	code, assignment = TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.GreaterOrEqual(t, assignment[0].End, end)
+	end = assignment[0].End
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+
+	//seek
+	code = TMQOffsetSeek(tmq, "test_tmq_assignment", int32(vgID), 0)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	code, assignment = TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.Equal(t, int64(0), assignment[0].Offset)
+	assert.GreaterOrEqual(t, assignment[0].End, end)
+	end = assignment[0].End
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+
+	haveMessage = false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			TMQCommitSync(tmq, message)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	code, assignment = TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.GreaterOrEqual(t, assignment[0].End, end)
+	end = assignment[0].End
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+
+	// seek twice
+	code = TMQOffsetSeek(tmq, "test_tmq_assignment", int32(vgID), 1)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	code, assignment = TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.GreaterOrEqual(t, assignment[0].End, end)
+	end = assignment[0].End
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+
+	haveMessage = false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			offset := TMQGetVgroupOffset(message)
+			assert.Greater(t, offset, int64(0))
+			TMQCommitSync(tmq, message)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	code, assignment = TMQGetTopicAssignment(tmq, "test_tmq_assignment")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	assert.Equal(t, 1, len(assignment))
+	assert.Equal(t, int64(0), assignment[0].Begin)
+	assert.GreaterOrEqual(t, assignment[0].End, end)
+	end = assignment[0].End
+	assert.Equal(t, int32(vgID), assignment[0].VGroupID)
+}
+
+func TestTMQPosition(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer TaosClose(conn)
+
+	defer func() {
+		if err = taosOperation(conn, "drop database if exists test_tmq_position"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err = taosOperation(conn, "create database if not exists test_tmq_position vgroups 1 WAL_RETENTION_PERIOD 86400"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "use test_tmq_position"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "create table if not exists t (ts timestamp,v int)"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// create topic
+	if err = taosOperation(conn, "create topic if not exists test_tmq_position_topic as select * from t"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		if err = taosOperation(conn, "drop topic if exists test_tmq_position_topic"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	conf := TMQConfNew()
+	defer TMQConfDestroy(conf)
+	TMQConfSet(conf, "group.id", "position")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
+
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer TMQConsumerClose(tmq)
+
+	topicList := TMQListNew()
+	TMQListAppend(topicList, "test_tmq_position_topic")
+
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Fatal(errors.NewError(int(errCode), errStr))
+		return
+	}
+	_ = taosOperation(conn, "insert into t values(now,1)")
+	code, assignment := TMQGetTopicAssignment(tmq, "test_tmq_position_topic")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	vgID := assignment[0].VGroupID
+	position := TMQPosition(tmq, "test_tmq_position_topic", vgID)
+	assert.Equal(t, position, int64(0))
+	haveMessage := false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			position := TMQPosition(tmq, "test_tmq_position_topic", vgID)
+			assert.Greater(t, position, int64(0))
+			committed := TMQCommitted(tmq, "test_tmq_position_topic", vgID)
+			assert.Less(t, committed, int64(0))
+			TMQCommitSync(tmq, message)
+			position = TMQPosition(tmq, "test_tmq_position_topic", vgID)
+			committed = TMQCommitted(tmq, "test_tmq_position_topic", vgID)
+			assert.Equal(t, position, committed)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	errCode = TMQUnsubscribe(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+}
+
+func TestTMQCommitOffset(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer TaosClose(conn)
+
+	defer func() {
+		if err = taosOperation(conn, "drop database if exists test_tmq_commit_offset"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err = taosOperation(conn, "create database if not exists test_tmq_commit_offset vgroups 1 WAL_RETENTION_PERIOD 86400"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "use test_tmq_commit_offset"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "create table if not exists t (ts timestamp,v int)"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// create topic
+	if err = taosOperation(conn, "create topic if not exists test_tmq_commit_offset_topic as select * from t"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		if err = taosOperation(conn, "drop topic if exists test_tmq_commit_offset_topic"); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	conf := TMQConfNew()
+	defer TMQConfDestroy(conf)
+	TMQConfSet(conf, "group.id", "commit")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
+
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer TMQConsumerClose(tmq)
+
+	topicList := TMQListNew()
+	TMQListAppend(topicList, "test_tmq_commit_offset_topic")
+
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Fatal(errors.NewError(int(errCode), errStr))
+		return
+	}
+	_ = taosOperation(conn, "insert into t values(now,1)")
+	code, assignment := TMQGetTopicAssignment(tmq, "test_tmq_commit_offset_topic")
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	vgID := assignment[0].VGroupID
+	haveMessage := false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			position := TMQPosition(tmq, "test_tmq_commit_offset_topic", vgID)
+			assert.Greater(t, position, int64(0))
+			committed := TMQCommitted(tmq, "test_tmq_commit_offset_topic", vgID)
+			assert.Less(t, committed, int64(0))
+			offset := TMQGetVgroupOffset(message)
+			code = TMQCommitOffsetSync(tmq, "test_tmq_commit_offset_topic", vgID, offset)
+			if code != 0 {
+				t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+			}
+			committed = TMQCommitted(tmq, "test_tmq_commit_offset_topic", vgID)
+			assert.Equal(t, int64(offset), committed)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	errCode = TMQUnsubscribe(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+}
+
+func TestTMQCommitOffsetAsync(t *testing.T) {
+	topic := "test_tmq_commit_offset_a_topic"
+	tableName := "test_tmq_commit_offset_a"
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer TaosClose(conn)
+
+	defer func() {
+		if err = taosOperation(conn, "drop database if exists "+tableName); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err = taosOperation(conn, "create database if not exists "+tableName+" vgroups 1 WAL_RETENTION_PERIOD 86400"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "use "+tableName); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "create table if not exists t (ts timestamp,v int)"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// create topic
+
+	if err = taosOperation(conn, "create topic if not exists "+topic+" as select * from t"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		if err = taosOperation(conn, "drop topic if exists "+topic); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	conf := TMQConfNew()
+	defer TMQConfDestroy(conf)
+	TMQConfSet(conf, "group.id", "commit_a")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
+
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer TMQConsumerClose(tmq)
+
+	topicList := TMQListNew()
+	TMQListAppend(topicList, topic)
+
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Fatal(errors.NewError(int(errCode), errStr))
+		return
+	}
+	_ = taosOperation(conn, "insert into t values(now,1)")
+	code, assignment := TMQGetTopicAssignment(tmq, topic)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	vgID := assignment[0].VGroupID
+	haveMessage := false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			position := TMQPosition(tmq, topic, vgID)
+			assert.Greater(t, position, int64(0))
+			committed := TMQCommitted(tmq, topic, vgID)
+			assert.Less(t, committed, int64(0))
+			offset := TMQGetVgroupOffset(message)
+			c := make(chan *TMQCommitCallbackResult, 1)
+			handler := cgo.NewHandle(c)
+			TMQCommitOffsetAsync(tmq, topic, vgID, offset, handler)
+			timer := time.NewTimer(time.Second * 5)
+			select {
+			case r := <-c:
+				code = r.ErrCode
+				if code != 0 {
+					t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+				}
+				timer.Stop()
+			case <-timer.C:
+				t.Fatal("commit async timeout")
+				timer.Stop()
+			}
+			committed = TMQCommitted(tmq, topic, vgID)
+			assert.Equal(t, int64(offset), committed)
+			TaosFreeResult(message)
+			break
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	errCode = TMQUnsubscribe(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+}
+
+func TestTMQCommitAsyncCallback(t *testing.T) {
+	topic := "test_tmq_commit_a_cb_topic"
+	tableName := "test_tmq_commit_a_cb"
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	defer TaosClose(conn)
+
+	defer func() {
+		if err = taosOperation(conn, "drop database if exists "+tableName); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if err = taosOperation(conn, "create database if not exists "+tableName+" vgroups 1 WAL_RETENTION_PERIOD 86400"); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "use "+tableName); err != nil {
+		t.Fatal(err)
+		return
+	}
+	if err = taosOperation(conn, "create table if not exists t (ts timestamp,v int)"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	// create topic
+
+	if err = taosOperation(conn, "create topic if not exists "+topic+" as select * from t"); err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		if err = taosOperation(conn, "drop topic if exists "+topic); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	conf := TMQConfNew()
+	defer TMQConfDestroy(conf)
+	TMQConfSet(conf, "group.id", "commit_a")
+	TMQConfSet(conf, "enable.auto.commit", "false")
+	TMQConfSet(conf, "auto.offset.reset", "earliest")
+	TMQConfSet(conf, "auto.commit.interval.ms", "100")
+	c := make(chan *TMQCommitCallbackResult, 1)
+	h := cgo.NewHandle(c)
+	TMQConfSetAutoCommitCB(conf, h)
+	go func() {
+		for r := range c {
+			t.Log("auto commit", r)
+			PutTMQCommitCallbackResult(r)
+		}
+	}()
+
+	tmq, err := TMQConsumerNew(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer TMQConsumerClose(tmq)
+
+	topicList := TMQListNew()
+	TMQListAppend(topicList, topic)
+
+	errCode := TMQSubscribe(tmq, topicList)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Fatal(errors.NewError(int(errCode), errStr))
+		return
+	}
+	_ = taosOperation(conn, "insert into t values(now,1)")
+	code, assignment := TMQGetTopicAssignment(tmq, topic)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	vgID := assignment[0].VGroupID
+	haveMessage := false
+	for i := 0; i < 3; i++ {
+		message := TMQConsumerPoll(tmq, 500)
+		if message != nil {
+			haveMessage = true
+			position := TMQPosition(tmq, topic, vgID)
+			assert.Greater(t, position, int64(0))
+			committed := TMQCommitted(tmq, topic, vgID)
+			assert.Less(t, committed, int64(0))
+			offset := TMQGetVgroupOffset(message)
+			TMQCommitOffsetSync(tmq, topic, vgID, offset)
+			committed = TMQCommitted(tmq, topic, vgID)
+			assert.Equal(t, offset, committed)
+			TaosFreeResult(message)
+		}
+	}
+	assert.True(t, haveMessage, "expect have message")
+	committed := TMQCommitted(tmq, topic, vgID)
+	t.Log(committed)
+	code, assignment = TMQGetTopicAssignment(tmq, topic)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	t.Log(assignment[0].Offset)
+	TMQCommitOffsetSync(tmq, topic, vgID, 1)
+	committed = TMQCommitted(tmq, topic, vgID)
+	assert.Equal(t, int64(1), committed)
+	code, assignment = TMQGetTopicAssignment(tmq, topic)
+	if code != 0 {
+		t.Fatal(errors.NewError(int(code), TMQErr2Str(code)))
+	}
+	t.Log(assignment[0].Offset)
+	position := TMQPosition(tmq, topic, vgID)
+	t.Log(position)
+	errCode = TMQUnsubscribe(tmq)
+	if errCode != 0 {
+		errStr := TMQErr2Str(errCode)
+		t.Error(errors.NewError(int(errCode), errStr))
+		return
+	}
+}
+
+func taosOperation(conn unsafe.Pointer, sql string) (err error) {
+	res := TaosQuery(conn, sql)
+	defer TaosFreeResult(res)
+	code := TaosError(res)
+	if code != 0 {
+		err = errors.NewError(code, TaosErrorStr(res))
+	}
+	return
 }

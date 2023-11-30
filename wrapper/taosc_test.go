@@ -153,6 +153,9 @@ func TestTaosQueryA(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:31
+// @description: test taos error
 func TestError(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -166,6 +169,9 @@ func TestError(t *testing.T) {
 	assert.NotEmpty(t, errStr)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:31
+// @description: test affected rows
 func TestAffectedRows(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -420,11 +426,17 @@ func TestTaosResultBlock(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:31
+// @description: test taos_get_client_info
 func TestTaosGetClientInfo(t *testing.T) {
 	s := TaosGetClientInfo()
 	assert.NotEmpty(t, s)
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:31
+// @description: test taos_load_table_info
 func TestTaosLoadTableInfo(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -463,6 +475,9 @@ func TestTaosLoadTableInfo(t *testing.T) {
 
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:32
+// @description: test taos_get_table_vgId
 func TestTaosGetTableVgID(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -510,6 +525,9 @@ func TestTaosGetTableVgID(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:32
+// @description: test taos_get_tables_vgId
 func TestTaosGetTablesVgID(t *testing.T) {
 	conn, err := TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -551,4 +569,39 @@ func TestTaosGetTablesVgID(t *testing.T) {
 	}
 	assert.Equal(t, 2, len(vgs2))
 	assert.Equal(t, vgs2, vgs1)
+}
+
+func TestTaosSetConnMode(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	assert.NoError(t, err)
+	defer TaosClose(conn)
+	code := TaosSetConnMode(conn, 0, 1)
+	if code != 0 {
+		t.Errorf("TaosSetConnMode() error code= %d, msg: %s", code, TaosErrorStr(nil))
+	}
+}
+
+func TestTaosGetCurrentDB(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	assert.NoError(t, err)
+	defer TaosClose(conn)
+	dbName := "current_db_test"
+	_ = exec(conn, fmt.Sprintf("drop database if exists %s", dbName))
+	err = exec(conn, fmt.Sprintf("create database %s", dbName))
+	assert.NoError(t, err)
+	defer func() {
+		_ = exec(conn, fmt.Sprintf("drop database if exists %s", dbName))
+	}()
+	_ = exec(conn, fmt.Sprintf("use %s", dbName))
+	db, err := TaosGetCurrentDB(conn)
+	assert.NoError(t, err)
+	assert.Equal(t, dbName, db)
+}
+
+func TestTaosGetServerInfo(t *testing.T) {
+	conn, err := TaosConnect("", "root", "taosdata", "", 0)
+	assert.NoError(t, err)
+	defer TaosClose(conn)
+	info := TaosGetServerInfo(conn)
+	assert.NotEmpty(t, info)
 }

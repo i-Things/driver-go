@@ -40,6 +40,7 @@ type Consumer struct {
 	withTableName        string
 	closeOnce            sync.Once
 	closeChan            chan struct{}
+	topics               []string
 }
 
 type IndexedChan struct {
@@ -281,13 +282,19 @@ func (c *Consumer) findOutChanByID(index uint64) *list.Element {
 }
 
 const (
-	TMQSubscribe     = "subscribe"
-	TMQPoll          = "poll"
-	TMQFetch         = "fetch"
-	TMQFetchBlock    = "fetch_block"
-	TMQFetchJsonMeta = "fetch_json_meta"
-	TMQCommit        = "commit"
-	TMQUnsubscribe   = "unsubscribe"
+	TMQSubscribe          = "subscribe"
+	TMQPoll               = "poll"
+	TMQFetch              = "fetch"
+	TMQFetchBlock         = "fetch_block"
+	TMQFetchJsonMeta      = "fetch_json_meta"
+	TMQCommit             = "commit"
+	TMQUnsubscribe        = "unsubscribe"
+	TMQGetTopicAssignment = "assignment"
+	TMQSeek               = "seek"
+	TMQCommitOffset       = "commit_offset"
+	TMQCommitted          = "committed"
+	TMQPosition           = "position"
+	TMQListTopics         = "list_topics"
 )
 
 var ClosedErr = errors.New("connection closed")
@@ -369,6 +376,8 @@ func (c *Consumer) SubscribeTopics(topics []string, rebalanceCb RebalanceCb) err
 	if resp.Code != 0 {
 		return taosErrors.NewError(resp.Code, resp.Message)
 	}
+	c.topics = make([]string, len(topics))
+	copy(c.topics, topics)
 	return nil
 }
 
@@ -415,19 +424,33 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 			result := &tmq.DataMessage{}
 			result.SetDbName(resp.Database)
 			result.SetTopic(resp.Topic)
+			result.SetOffset(tmq.Offset(resp.Offset))
 			data, err := c.fetch(resp.MessageID)
 			if err != nil {
 				return tmq.NewTMQErrorWithErr(err)
 			}
 			result.SetData(data)
+			topic := resp.Topic
+			result.TopicPartition = tmq.TopicPartition{
+				Topic:     &topic,
+				Partition: resp.VgroupID,
+				Offset:    tmq.Offset(resp.Offset),
+			}
 			return result
 		case common.TMQ_RES_TABLE_META:
 			result := &tmq.MetaMessage{}
 			result.SetDbName(resp.Database)
 			result.SetTopic(resp.Topic)
+			result.SetOffset(tmq.Offset(resp.Offset))
 			meta, err := c.fetchJsonMeta(resp.MessageID)
 			if err != nil {
 				return tmq.NewTMQErrorWithErr(err)
+			}
+			topic := resp.Topic
+			result.TopicPartition = tmq.TopicPartition{
+				Topic:     &topic,
+				Partition: resp.VgroupID,
+				Offset:    tmq.Offset(resp.Offset),
 			}
 			result.SetMeta(meta)
 			return result
@@ -435,6 +458,7 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 			result := &tmq.MetaDataMessage{}
 			result.SetDbName(resp.Database)
 			result.SetTopic(resp.Topic)
+			result.SetOffset(tmq.Offset(resp.Offset))
 			meta, err := c.fetchJsonMeta(resp.MessageID)
 			if err != nil {
 				return tmq.NewTMQErrorWithErr(err)
@@ -447,6 +471,12 @@ func (c *Consumer) Poll(timeoutMs int) tmq.Event {
 				Meta: meta,
 				Data: data,
 			})
+			topic := resp.Topic
+			result.TopicPartition = tmq.TopicPartition{
+				Topic:     &topic,
+				Partition: resp.VgroupID,
+				Offset:    tmq.Offset(resp.Offset),
+			}
 			return result
 		default:
 			return tmq.NewTMQErrorWithErr(err)
@@ -558,7 +588,8 @@ func (c *Consumer) fetch(messageID uint64) ([]*tmq.Data, error) {
 				return nil, err
 			}
 			block := respBytes[24:]
-			data := parser.ReadBlock(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(&block))), resp.Rows, resp.FieldsTypes, resp.Precision)
+			p := unsafe.Pointer(&block[0])
+			data := parser.ReadBlock(p, resp.Rows, resp.FieldsTypes, resp.Precision)
 			tmqData = append(tmqData, &tmq.Data{
 				TableName: resp.TableName,
 				Data:      data,
@@ -607,7 +638,11 @@ func (c *Consumer) doCommit(messageID uint64) ([]tmq.TopicPartition, error) {
 	if resp.Code != 0 {
 		return nil, taosErrors.NewError(resp.Code, resp.Message)
 	}
-	return nil, nil
+	partitions, err := c.Assignment()
+	if err != nil {
+		return nil, err
+	}
+	return c.Committed(partitions, 0)
 }
 
 func (c *Consumer) Unsubscribe() error {
@@ -645,4 +680,233 @@ func (c *Consumer) Unsubscribe() error {
 		return taosErrors.NewError(resp.Code, resp.Message)
 	}
 	return nil
+}
+
+func (c *Consumer) Assignment() (partitions []tmq.TopicPartition, err error) {
+	if c.err != nil {
+		return nil, c.err
+	}
+	for _, topic := range c.topics {
+		reqID := c.generateReqID()
+		req := &AssignmentReq{
+			ReqID: reqID,
+			Topic: topic,
+		}
+		args, err := client.JsonI.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		action := &client.WSAction{
+			Action: TMQGetTopicAssignment,
+			Args:   args,
+		}
+		envelope := c.client.GetEnvelope()
+		err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+		if err != nil {
+			c.client.PutEnvelope(envelope)
+			return nil, err
+		}
+		respBytes, err := c.sendText(reqID, envelope)
+		if err != nil {
+			return nil, err
+		}
+		var resp AssignmentResp
+		err = client.JsonI.Unmarshal(respBytes, &resp)
+		if err != nil {
+			return nil, err
+		}
+		if resp.Code != 0 {
+			return nil, taosErrors.NewError(resp.Code, resp.Message)
+		}
+		topicName := topic
+		for i := 0; i < len(resp.Assignment); i++ {
+			offset := tmq.Offset(resp.Assignment[i].Offset)
+			partitions = append(partitions, tmq.TopicPartition{
+				Topic:     &topicName,
+				Partition: resp.Assignment[i].VGroupID,
+				Offset:    offset,
+			})
+		}
+	}
+	return partitions, nil
+}
+
+func (c *Consumer) Seek(partition tmq.TopicPartition, ignoredTimeoutMs int) error {
+	if c.err != nil {
+		return c.err
+	}
+	reqID := c.generateReqID()
+	req := &OffsetSeekReq{
+		ReqID:    reqID,
+		Topic:    *partition.Topic,
+		VgroupID: partition.Partition,
+		Offset:   int64(partition.Offset),
+	}
+	args, err := client.JsonI.Marshal(req)
+	if err != nil {
+		return err
+	}
+	action := &client.WSAction{
+		Action: TMQSeek,
+		Args:   args,
+	}
+	envelope := c.client.GetEnvelope()
+	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+	if err != nil {
+		c.client.PutEnvelope(envelope)
+		return err
+	}
+	respBytes, err := c.sendText(reqID, envelope)
+	if err != nil {
+		return err
+	}
+	var resp OffsetSeekResp
+	err = client.JsonI.Unmarshal(respBytes, &resp)
+	if err != nil {
+		return err
+	}
+	if resp.Code != 0 {
+		return taosErrors.NewError(resp.Code, resp.Message)
+	}
+	return nil
+}
+
+func (c *Consumer) Committed(partitions []tmq.TopicPartition, timeoutMs int) (offsets []tmq.TopicPartition, err error) {
+	offsets = make([]tmq.TopicPartition, len(partitions))
+	reqID := c.generateReqID()
+	req := &CommittedReq{
+		ReqID:          reqID,
+		TopicVgroupIDs: make([]TopicVgroupID, len(partitions)),
+	}
+	for i := 0; i < len(partitions); i++ {
+		req.TopicVgroupIDs[i] = TopicVgroupID{
+			Topic:    *partitions[i].Topic,
+			VgroupID: partitions[i].Partition,
+		}
+	}
+	args, err := client.JsonI.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	action := &client.WSAction{
+		Action: TMQCommitted,
+		Args:   args,
+	}
+	envelope := c.client.GetEnvelope()
+	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+	if err != nil {
+		c.client.PutEnvelope(envelope)
+		return nil, err
+	}
+	respBytes, err := c.sendText(reqID, envelope)
+	if err != nil {
+		return nil, err
+	}
+	var resp CommittedResp
+	err = client.JsonI.Unmarshal(respBytes, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Code != 0 {
+		return nil, taosErrors.NewError(resp.Code, resp.Message)
+	}
+	for i := 0; i < len(resp.Committed); i++ {
+		offsets[i] = tmq.TopicPartition{
+			Topic:     partitions[i].Topic,
+			Partition: partitions[i].Partition,
+			Offset:    tmq.Offset(resp.Committed[i]),
+		}
+	}
+	return offsets, nil
+}
+
+func (c *Consumer) CommitOffsets(offsets []tmq.TopicPartition) ([]tmq.TopicPartition, error) {
+	if c.err != nil {
+		return nil, c.err
+	}
+	for i := 0; i < len(offsets); i++ {
+		reqID := c.generateReqID()
+		req := &CommitOffsetReq{
+			ReqID:    reqID,
+			Topic:    *offsets[i].Topic,
+			VgroupID: offsets[i].Partition,
+			Offset:   int64(offsets[i].Offset),
+		}
+		args, err := client.JsonI.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		action := &client.WSAction{
+			Action: TMQCommitOffset,
+			Args:   args,
+		}
+		envelope := c.client.GetEnvelope()
+		err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+		if err != nil {
+			c.client.PutEnvelope(envelope)
+			return nil, err
+		}
+		respBytes, err := c.sendText(reqID, envelope)
+		if err != nil {
+			return nil, err
+		}
+		var resp CommitOffsetResp
+		err = client.JsonI.Unmarshal(respBytes, &resp)
+		if err != nil {
+			return nil, err
+		}
+		if resp.Code != 0 {
+			return nil, taosErrors.NewError(resp.Code, resp.Message)
+		}
+	}
+	return c.Committed(offsets, 0)
+}
+
+func (c *Consumer) Position(partitions []tmq.TopicPartition) (offsets []tmq.TopicPartition, err error) {
+	offsets = make([]tmq.TopicPartition, len(partitions))
+	reqID := c.generateReqID()
+	req := &PositionReq{
+		ReqID:          reqID,
+		TopicVgroupIDs: make([]TopicVgroupID, len(partitions)),
+	}
+	for i := 0; i < len(partitions); i++ {
+		req.TopicVgroupIDs[i] = TopicVgroupID{
+			Topic:    *partitions[i].Topic,
+			VgroupID: partitions[i].Partition,
+		}
+	}
+	args, err := client.JsonI.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	action := &client.WSAction{
+		Action: TMQPosition,
+		Args:   args,
+	}
+	envelope := c.client.GetEnvelope()
+	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+	if err != nil {
+		c.client.PutEnvelope(envelope)
+		return nil, err
+	}
+	respBytes, err := c.sendText(reqID, envelope)
+	if err != nil {
+		return nil, err
+	}
+	var resp PositionResp
+	err = client.JsonI.Unmarshal(respBytes, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Code != 0 {
+		return nil, taosErrors.NewError(resp.Code, resp.Message)
+	}
+	for i := 0; i < len(resp.Position); i++ {
+		offsets[i] = tmq.TopicPartition{
+			Topic:     partitions[i].Topic,
+			Partition: partitions[i].Partition,
+			Offset:    tmq.Offset(resp.Position[i]),
+		}
+	}
+	return offsets, nil
 }

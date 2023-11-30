@@ -9,10 +9,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/taosdata/driver-go/v3/common"
+	"github.com/taosdata/driver-go/v3/common/pointer"
 	"github.com/taosdata/driver-go/v3/errors"
 	"github.com/taosdata/driver-go/v3/wrapper"
 )
 
+// @author: xftan
+// @date: 2023/10/13 11:13
+// @description: test block
 func TestReadBlock(t *testing.T) {
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -102,8 +106,8 @@ func TestReadBlock(t *testing.T) {
 		return
 	}
 	precision := wrapper.TaosResultPrecision(res)
-	pHeaderList := make([]uintptr, fileCount)
-	pStartList := make([]uintptr, fileCount)
+	pHeaderList := make([]unsafe.Pointer, fileCount)
+	pStartList := make([]unsafe.Pointer, fileCount)
 	var data [][]driver.Value
 	for {
 		blockSize, errCode, block := wrapper.TaosFetchRawBlock(res)
@@ -119,20 +123,20 @@ func TestReadBlock(t *testing.T) {
 		}
 		nullBitMapOffset := uintptr(BitmapLen(blockSize))
 		lengthOffset := RawBlockGetColumnLengthOffset(fileCount)
-		tmpPHeader := uintptr(block) + RawBlockGetColDataOffset(fileCount)
-		var tmpPStart uintptr
+		tmpPHeader := pointer.AddUintptr(block, RawBlockGetColDataOffset(fileCount))
+		var tmpPStart unsafe.Pointer
 		for column := 0; column < fileCount; column++ {
-			colLength := *((*int32)(unsafe.Pointer(uintptr(block) + lengthOffset + uintptr(column)*Int32Size)))
+			colLength := *((*int32)(pointer.AddUintptr(block, lengthOffset+uintptr(column)*Int32Size)))
 			if IsVarDataType(rh.ColTypes[column]) {
 				pHeaderList[column] = tmpPHeader
-				tmpPStart = tmpPHeader + Int32Size*uintptr(blockSize)
+				tmpPStart = pointer.AddUintptr(tmpPHeader, Int32Size*uintptr(blockSize))
 				pStartList[column] = tmpPStart
 			} else {
 				pHeaderList[column] = tmpPHeader
-				tmpPStart = tmpPHeader + nullBitMapOffset
+				tmpPStart = pointer.AddUintptr(tmpPHeader, nullBitMapOffset)
 				pStartList[column] = tmpPStart
 			}
-			tmpPHeader = tmpPStart + uintptr(colLength)
+			tmpPHeader = pointer.AddUintptr(tmpPStart, uintptr(colLength))
 		}
 		for row := 0; row < blockSize; row++ {
 			rowV := make([]driver.Value, fileCount)
@@ -169,6 +173,9 @@ func TestReadBlock(t *testing.T) {
 	}
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:13
+// @description: test block tag
 func TestBlockTag(t *testing.T) {
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -244,8 +251,8 @@ func TestBlockTag(t *testing.T) {
 		return
 	}
 	precision := wrapper.TaosResultPrecision(res)
-	pHeaderList := make([]uintptr, fileCount)
-	pStartList := make([]uintptr, fileCount)
+	pHeaderList := make([]unsafe.Pointer, fileCount)
+	pStartList := make([]unsafe.Pointer, fileCount)
 	var data [][]driver.Value
 	for {
 		blockSize, errCode, block := wrapper.TaosFetchRawBlock(res)
@@ -261,20 +268,20 @@ func TestBlockTag(t *testing.T) {
 		}
 		nullBitMapOffset := uintptr(BitmapLen(blockSize))
 		lengthOffset := RawBlockGetColumnLengthOffset(fileCount)
-		tmpPHeader := uintptr(block) + RawBlockGetColDataOffset(fileCount) // length i32, group u64
-		var tmpPStart uintptr
+		tmpPHeader := pointer.AddUintptr(block, RawBlockGetColDataOffset(fileCount)) // length i32, group u64
+		var tmpPStart unsafe.Pointer
 		for column := 0; column < fileCount; column++ {
-			colLength := *((*int32)(unsafe.Pointer(uintptr(block) + lengthOffset + uintptr(column)*Int32Size)))
+			colLength := *((*int32)(pointer.AddUintptr(block, lengthOffset+uintptr(column)*Int32Size)))
 			if IsVarDataType(rh.ColTypes[column]) {
 				pHeaderList[column] = tmpPHeader
-				tmpPStart = tmpPHeader + Int32Size*uintptr(blockSize)
+				tmpPStart = pointer.AddUintptr(tmpPHeader, Int32Size*uintptr(blockSize))
 				pStartList[column] = tmpPStart
 			} else {
 				pHeaderList[column] = tmpPHeader
-				tmpPStart = tmpPHeader + nullBitMapOffset
+				tmpPStart = pointer.AddUintptr(tmpPHeader, nullBitMapOffset)
 				pStartList[column] = tmpPStart
 			}
-			tmpPHeader = tmpPStart + uintptr(colLength)
+			tmpPHeader = pointer.AddUintptr(tmpPStart, uintptr(colLength))
 		}
 		for row := 0; row < blockSize; row++ {
 			rowV := make([]driver.Value, fileCount)
@@ -292,6 +299,9 @@ func TestBlockTag(t *testing.T) {
 	t.Log(len(data[0][1].(string)))
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:18
+// @description: test read row
 func TestReadRow(t *testing.T) {
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -427,6 +437,9 @@ func TestReadRow(t *testing.T) {
 	assert.Equal(t, []byte(`{"a":1}`), row2[14].([]byte))
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:18
+// @description: test read block with time format
 func TestReadBlockWithTimeFormat(t *testing.T) {
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -560,6 +573,9 @@ func TestReadBlockWithTimeFormat(t *testing.T) {
 	assert.Equal(t, []byte(`{"a":1}`), row2[14].([]byte))
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:18
+// @description: test parse block
 func TestParseBlock(t *testing.T) {
 	conn, err := wrapper.TaosConnect("", "root", "taosdata", "", 0)
 	if err != nil {
@@ -611,7 +627,9 @@ func TestParseBlock(t *testing.T) {
 		"c10 float,"+
 		"c11 double,"+
 		"c12 binary(20),"+
-		"c13 nchar(20)"+
+		"c13 nchar(20),"+
+		"c14 varbinary(20),"+
+		"c15 geometry(100)"+
 		") tags (info json)")
 	code = wrapper.TaosError(res)
 	if code != 0 {
@@ -623,7 +641,9 @@ func TestParseBlock(t *testing.T) {
 	wrapper.TaosFreeResult(res)
 	now := time.Now()
 	after1s := now.Add(time.Second)
-	sql := fmt.Sprintf("insert into parse_block.t0 using parse_block.all_type tags('{\"a\":1}') values('%s',1,1,1,1,1,1,1,1,1,1,1,'test_binary','test_nchar')('%s',null,null,null,null,null,null,null,null,null,null,null,null,null)", now.Format(time.RFC3339Nano), after1s.Format(time.RFC3339Nano))
+	sql := fmt.Sprintf("insert into parse_block.t0 using parse_block.all_type tags('{\"a\":1}') "+
+		"values('%s',1,1,1,1,1,1,1,1,1,1,1,'test_binary','test_nchar','test_varbinary','POINT(100 100)')"+
+		"('%s',null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)", now.Format(time.RFC3339Nano), after1s.Format(time.RFC3339Nano))
 	res = wrapper.TaosQuery(conn, sql)
 	code = wrapper.TaosError(res)
 	if code != 0 {
@@ -666,11 +686,11 @@ func TestParseBlock(t *testing.T) {
 		version := RawBlockGetVersion(block)
 		assert.Equal(t, int32(1), version)
 		length := RawBlockGetLength(block)
-		assert.Equal(t, int32(374), length)
+		assert.Equal(t, int32(447), length)
 		rows := RawBlockGetNumOfRows(block)
 		assert.Equal(t, int32(2), rows)
 		columns := RawBlockGetNumOfCols(block)
-		assert.Equal(t, int32(15), columns)
+		assert.Equal(t, int32(17), columns)
 		hasColumnSegment := RawBlockGetHasColumnSegment(block)
 		assert.Equal(t, int32(-2147483648), hasColumnSegment)
 		groupId := RawBlockGetGroupID(block)
@@ -737,6 +757,14 @@ func TestParseBlock(t *testing.T) {
 					Bytes:   82,
 				},
 				{
+					ColType: 16,
+					Bytes:   22,
+				},
+				{
+					ColType: 20,
+					Bytes:   102,
+				},
+				{
 					ColType: 15,
 					Bytes:   16384,
 				},
@@ -763,11 +791,13 @@ func TestParseBlock(t *testing.T) {
 	assert.Equal(t, float64(1), row1[11].(float64))
 	assert.Equal(t, "test_binary", row1[12].(string))
 	assert.Equal(t, "test_nchar", row1[13].(string))
-	assert.Equal(t, []byte(`{"a":1}`), row1[14].([]byte))
+	assert.Equal(t, []byte("test_varbinary"), row1[14].([]byte))
+	assert.Equal(t, []byte{0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40}, row1[15].([]byte))
+	assert.Equal(t, []byte(`{"a":1}`), row1[16].([]byte))
 	row2 := data[1]
 	assert.Equal(t, after1s.UnixNano()/1e6, row2[0].(time.Time).UnixNano()/1e6)
-	for i := 1; i < 14; i++ {
+	for i := 1; i < 16; i++ {
 		assert.Nil(t, row2[i])
 	}
-	assert.Equal(t, []byte(`{"a":1}`), row2[14].([]byte))
+	assert.Equal(t, []byte(`{"a":1}`), row2[16].([]byte))
 }

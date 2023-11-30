@@ -22,7 +22,7 @@ func prepareEnv() error {
 		"drop topic if exists test_ws_tmq_topic",
 		"drop database if exists test_ws_tmq",
 		"create database test_ws_tmq WAL_RETENTION_PERIOD 86400",
-		"create topic test_ws_tmq_topic with meta as database test_ws_tmq",
+		"create topic test_ws_tmq_topic as database test_ws_tmq",
 	}
 	for _, step := range steps {
 		err = doRequest(step)
@@ -86,6 +86,9 @@ func doRequest(payload string) error {
 	return nil
 }
 
+// @author: xftan
+// @date: 2023/10/13 11:36
+// @description: test tmq subscribe over websocket
 func TestConsumer(t *testing.T) {
 	err := prepareEnv()
 	if err != nil {
@@ -121,19 +124,18 @@ func TestConsumer(t *testing.T) {
 		}
 	}()
 	consumer, err := NewConsumer(&tmq.ConfigMap{
-		"ws.url":                       "ws://127.0.0.1:6041/rest/tmq",
-		"ws.message.channelLen":        uint(0),
-		"ws.message.timeout":           common.DefaultMessageTimeout,
-		"ws.message.writeWait":         common.DefaultWriteWait,
-		"td.connect.user":              "root",
-		"td.connect.pass":              "taosdata",
-		"group.id":                     "test",
-		"client.id":                    "test_consumer",
-		"auto.offset.reset":            "earliest",
-		"enable.auto.commit":           "true",
-		"auto.commit.interval.ms":      "5000",
-		"experimental.snapshot.enable": "true",
-		"msg.with.table.name":          "true",
+		"ws.url":                  "ws://127.0.0.1:6041/rest/tmq",
+		"ws.message.channelLen":   uint(0),
+		"ws.message.timeout":      common.DefaultMessageTimeout,
+		"ws.message.writeWait":    common.DefaultWriteWait,
+		"td.connect.user":         "root",
+		"td.connect.pass":         "taosdata",
+		"group.id":                "test",
+		"client.id":               "test_consumer",
+		"auto.offset.reset":       "earliest",
+		"enable.auto.commit":      "true",
+		"auto.commit.interval.ms": "5000",
+		"msg.with.table.name":     "true",
 	})
 	if err != nil {
 		t.Error(err)
@@ -146,10 +148,9 @@ func TestConsumer(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	gotMeta := false
 	gotData := false
 	for i := 0; i < 5; i++ {
-		if gotData && gotMeta {
+		if gotData {
 			return
 		}
 		ev := consumer.Poll(0)
@@ -177,84 +178,23 @@ func TestConsumer(t *testing.T) {
 				assert.Equal(t, float64(11.123), v[11].(float64))
 				assert.Equal(t, "binary", v[12].(string))
 				assert.Equal(t, "nchar", v[13].(string))
-			case *tmq.MetaMessage:
-				gotMeta = true
-				meta := e.Value().(*tmq.Meta)
-				assert.Equal(t, "test_ws_tmq", e.DBName())
-				assert.Equal(t, "create", meta.Type)
-				assert.Equal(t, "t_all", meta.TableName)
-				assert.Equal(t, "normal", meta.TableType)
-				assert.Equal(t, []*tmq.Column{
-					{
-						Name:   "ts",
-						Type:   9,
-						Length: 0,
-					},
-					{
-						Name:   "c1",
-						Type:   1,
-						Length: 0,
-					},
-					{
-						Name:   "c2",
-						Type:   2,
-						Length: 0,
-					},
-					{
-						Name:   "c3",
-						Type:   3,
-						Length: 0,
-					},
-					{
-						Name:   "c4",
-						Type:   4,
-						Length: 0,
-					},
-					{
-						Name:   "c5",
-						Type:   5,
-						Length: 0,
-					},
-					{
-						Name:   "c6",
-						Type:   11,
-						Length: 0,
-					},
-					{
-						Name:   "c7",
-						Type:   12,
-						Length: 0,
-					},
-					{
-						Name:   "c8",
-						Type:   13,
-						Length: 0,
-					},
-					{
-						Name:   "c9",
-						Type:   14,
-						Length: 0,
-					},
-					{
-						Name:   "c10",
-						Type:   6,
-						Length: 0,
-					},
-					{
-						Name:   "c11",
-						Type:   7,
-						Length: 0,
-					},
-					{
-						Name:   "c12",
-						Type:   8,
-						Length: 20,
-					},
-					{
-						Name:   "c13",
-						Type:   10,
-						Length: 20,
-					}}, meta.Columns)
+				t.Log(e.Offset())
+				ass, err := consumer.Assignment()
+				t.Log(ass)
+				committed, err := consumer.Committed(ass, 0)
+				t.Log(committed)
+				position, _ := consumer.Position(ass)
+				t.Log(position)
+				offsets, err := consumer.Position([]tmq.TopicPartition{e.TopicPartition})
+				assert.NoError(t, err)
+				_, err = consumer.CommitOffsets(offsets)
+				assert.NoError(t, err)
+				ass, err = consumer.Assignment()
+				t.Log(ass)
+				committed, err = consumer.Committed(ass, 0)
+				t.Log(committed)
+				position, _ = consumer.Position(ass)
+				t.Log(position)
 			case tmq.Error:
 				t.Error(e)
 				return
@@ -262,16 +202,13 @@ func TestConsumer(t *testing.T) {
 				t.Error("unexpected", e)
 				return
 			}
-			_, err = consumer.Commit()
+
 		}
 
 		if err != nil {
 			t.Error(err)
 			return
 		}
-	}
-	if !gotMeta {
-		t.Error("no meta got")
 	}
 	if !gotData {
 		t.Error("no data got")
@@ -281,4 +218,135 @@ func TestConsumer(t *testing.T) {
 		t.Error(err)
 		return
 	}
+}
+
+func prepareSeekEnv() error {
+	var err error
+	steps := []string{
+		"drop topic if exists test_ws_tmq_seek_topic",
+		"drop database if exists test_ws_tmq_seek",
+		"create database test_ws_tmq_seek vgroups 1 WAL_RETENTION_PERIOD 86400",
+		"create topic test_ws_tmq_seek_topic as database test_ws_tmq_seek",
+		"create table test_ws_tmq_seek.t1(ts timestamp,v int)",
+		"insert into test_ws_tmq_seek.t1 values (now,1)",
+	}
+	for _, step := range steps {
+		err = doRequest(step)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cleanSeekEnv() error {
+	var err error
+	time.Sleep(2 * time.Second)
+	steps := []string{
+		"drop topic if exists test_ws_tmq_seek_topic",
+		"drop database if exists test_ws_tmq_seek",
+	}
+	for _, step := range steps {
+		err = doRequest(step)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// @author: xftan
+// @date: 2023/10/13 11:36
+// @description: test tmq seek over websocket
+func TestSeek(t *testing.T) {
+	err := prepareSeekEnv()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer cleanSeekEnv()
+	consumer, err := NewConsumer(&tmq.ConfigMap{
+		"ws.url":                       "ws://127.0.0.1:6041/rest/tmq",
+		"ws.message.channelLen":        uint(0),
+		"ws.message.timeout":           common.DefaultMessageTimeout,
+		"ws.message.writeWait":         common.DefaultWriteWait,
+		"td.connect.user":              "root",
+		"td.connect.pass":              "taosdata",
+		"group.id":                     "test",
+		"client.id":                    "test_consumer",
+		"auto.offset.reset":            "earliest",
+		"enable.auto.commit":           "false",
+		"experimental.snapshot.enable": "false",
+		"msg.with.table.name":          "true",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer consumer.Close()
+	topic := []string{"test_ws_tmq_seek_topic"}
+	err = consumer.SubscribeTopics(topic, nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	partitions, err := consumer.Assignment()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(partitions))
+	assert.Equal(t, "test_ws_tmq_seek_topic", *partitions[0].Topic)
+	assert.Equal(t, tmq.Offset(0), partitions[0].Offset)
+
+	//poll
+	messageOffset := tmq.Offset(0)
+	haveMessage := false
+	for i := 0; i < 5; i++ {
+		event := consumer.Poll(500)
+		if event != nil {
+			haveMessage = true
+			_, err = consumer.Commit()
+			assert.NoError(t, err)
+			messageOffset = event.(*tmq.DataMessage).Offset()
+		}
+	}
+	assert.True(t, haveMessage)
+	partitions, err = consumer.Assignment()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(partitions))
+	assert.Equal(t, "test_ws_tmq_seek_topic", *partitions[0].Topic)
+	assert.GreaterOrEqual(t, partitions[0].Offset, messageOffset)
+
+	//seek
+	tmpTopic := "test_ws_tmq_seek_topic"
+	err = consumer.Seek(tmq.TopicPartition{
+		Topic:     &tmpTopic,
+		Partition: partitions[0].Partition,
+		Offset:    0,
+	}, 0)
+	assert.NoError(t, err)
+
+	//assignment
+	partitions, err = consumer.Assignment()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(partitions))
+	assert.Equal(t, "test_ws_tmq_seek_topic", *partitions[0].Topic)
+	assert.Equal(t, tmq.Offset(0), partitions[0].Offset)
+
+	//poll
+	messageOffset = tmq.Offset(0)
+	haveMessage = false
+	for i := 0; i < 5; i++ {
+		event := consumer.Poll(500)
+		if event != nil {
+			haveMessage = true
+			messageOffset = event.(*tmq.DataMessage).Offset()
+			_, err = consumer.Commit()
+			assert.NoError(t, err)
+		}
+	}
+	partitions, err = consumer.Assignment()
+	assert.True(t, haveMessage)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(partitions))
+	assert.Equal(t, "test_ws_tmq_seek_topic", *partitions[0].Topic)
+	assert.GreaterOrEqual(t, partitions[0].Offset, messageOffset)
 }

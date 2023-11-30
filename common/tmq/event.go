@@ -61,12 +61,15 @@ type Message interface {
 	Topic() string
 	DBName() string
 	Value() interface{}
+	Offset() int64
 }
 
 type DataMessage struct {
-	dbName string
-	topic  string
-	data   []*Data
+	TopicPartition TopicPartition
+	dbName         string
+	topic          string
+	data           []*Data
+	offset         Offset
 }
 
 func (m *DataMessage) String() string {
@@ -86,6 +89,10 @@ func (m *DataMessage) SetData(data []*Data) {
 	m.data = data
 }
 
+func (m *DataMessage) SetOffset(offset Offset) {
+	m.offset = offset
+}
+
 func (m *DataMessage) Topic() string {
 	return m.topic
 }
@@ -98,11 +105,20 @@ func (m *DataMessage) Value() interface{} {
 	return m.data
 }
 
+func (m *DataMessage) Offset() Offset {
+	return m.offset
+}
+
 type MetaMessage struct {
-	dbName string
-	topic  string
-	offset string
-	meta   *Meta
+	TopicPartition TopicPartition
+	dbName         string
+	topic          string
+	offset         Offset
+	meta           *Meta
+}
+
+func (m *MetaMessage) Offset() Offset {
+	return m.offset
 }
 
 func (m *MetaMessage) String() string {
@@ -118,7 +134,7 @@ func (m *MetaMessage) SetTopic(topic string) {
 	m.topic = topic
 }
 
-func (m *MetaMessage) SetOffset(offset string) {
+func (m *MetaMessage) SetOffset(offset Offset) {
 	m.offset = offset
 }
 
@@ -139,10 +155,15 @@ func (m *MetaMessage) Value() interface{} {
 }
 
 type MetaDataMessage struct {
-	dbName   string
-	topic    string
-	offset   string
-	metaData *MetaData
+	TopicPartition TopicPartition
+	dbName         string
+	topic          string
+	offset         Offset
+	metaData       *MetaData
+}
+
+func (m *MetaDataMessage) Offset() Offset {
+	return m.offset
 }
 
 func (m *MetaDataMessage) String() string {
@@ -158,7 +179,7 @@ func (m *MetaDataMessage) SetTopic(topic string) {
 	m.topic = topic
 }
 
-func (m *MetaDataMessage) SetOffset(offset string) {
+func (m *MetaDataMessage) SetOffset(offset Offset) {
 	m.offset = offset
 }
 
