@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/taosdata/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common"
 )
 
 // @author: xftan

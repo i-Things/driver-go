@@ -3,8 +3,8 @@ package param
 import (
 	"testing"
 
+	"github.com/i-Things/driver-go/v3/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/types"
 )
 
 func TestColumnType_AddBool(t *testing.T) {

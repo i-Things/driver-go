@@ -13,10 +13,10 @@ import (
 	"errors"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/stmt"
-	taosError "github.com/taosdata/driver-go/v3/errors"
-	taosTypes "github.com/taosdata/driver-go/v3/types"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/stmt"
+	taosError "github.com/i-Things/driver-go/v3/errors"
+	taosTypes "github.com/i-Things/driver-go/v3/types"
 )
 
 // TaosStmtInit TAOS_STMT *taos_stmt_init(TAOS *taos);

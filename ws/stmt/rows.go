@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/common/pointer"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/common/pointer"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 )
 
 type Rows struct {

@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/param"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/param"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
 )
 
 func prepareEnv(db string) error {

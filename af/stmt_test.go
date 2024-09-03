@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/param"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/param"
 )
 
 func TestNewStmt(t *testing.T) {

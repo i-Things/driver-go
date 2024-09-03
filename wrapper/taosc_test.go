@@ -8,11 +8,11 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
 
 // @author: xftan

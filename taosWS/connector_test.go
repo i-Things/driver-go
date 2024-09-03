@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/i-Things/driver-go/v3/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/types"
 )
 
 func generateCreateTableSql(db string, withJson bool) string {

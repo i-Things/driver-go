@@ -6,8 +6,8 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/pointer"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/pointer"
 )
 
 const (

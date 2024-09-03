@@ -39,7 +39,7 @@ go mod init taos-demo
 ```go
 import (
     "database/sql"
-    _ "github.com/taosdata/driver-go/v3/taosSql"
+    _ "github.com/i-Things/driver-go/v3/taosSql"
 )
 ```
 
@@ -52,7 +52,7 @@ go mod tidy
 或通过 `go get` 直接下载安装：
 
 ```sh
-go get github.com/taosdata/driver-go/v3/taosSql
+go get github.com/i-Things/driver-go/v3/taosSql
 ```
 
 ## 用法
@@ -69,7 +69,7 @@ import (
     "fmt"
     "time"
 
-    _ "github.com/taosdata/driver-go/v3/taosSql"
+    _ "github.com/i-Things/driver-go/v3/taosSql"
 )
 
 func main() {
@@ -287,7 +287,7 @@ import (
     "fmt"
     "time"
 
-    _ "github.com/taosdata/driver-go/v3/taosRestful"
+    _ "github.com/i-Things/driver-go/v3/taosRestful"
 )
 
 func main() {
@@ -334,7 +334,7 @@ func main() {
 ```go
 import (
     "database/sql"
-    _ "github.com/taosdata/driver-go/v3/taosRestful"
+    _ "github.com/i-Things/driver-go/v3/taosRestful"
 )
 ```
 
@@ -370,7 +370,7 @@ import (
     "fmt"
     "time"
 
-    _ "github.com/taosdata/driver-go/v3/taosRestful"
+    _ "github.com/i-Things/driver-go/v3/taosRestful"
 )
 
 func main() {
@@ -422,7 +422,7 @@ import (
     "fmt"
     "time"
 
-    _ "github.com/taosdata/driver-go/v3/taosWS"
+    _ "github.com/i-Things/driver-go/v3/taosWS"
 )
 
 func main() {
@@ -469,7 +469,7 @@ func main() {
 ```go
 import (
     "database/sql"
-    _ "github.com/taosdata/driver-go/v3/taosWS"
+    _ "github.com/i-Things/driver-go/v3/taosWS"
 )
 ```
 
@@ -672,6 +672,6 @@ driver-go
 
 ## 导航
 
-driver-go: [https://github.com/taosdata/driver-go](https://github.com/taosdata/driver-go)
+driver-go: [https://github.com/i-Things/driver-go](https://github.com/i-Things/driver-go)
 
-TDengine: [https://github.com/taosdata/TDengine](https://github.com/taosdata/TDengine)
+TDengine: [https://github.com/i-Things/TDengine](https://github.com/i-Things/TDengine)

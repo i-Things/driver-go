@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/core/timex"
 	"net/url"
 	"strings"
 	"sync"
@@ -14,10 +16,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/i-Things/driver-go/v3/common"
+	stmtCommon "github.com/i-Things/driver-go/v3/common/stmt"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/taosdata/driver-go/v3/common"
-	stmtCommon "github.com/taosdata/driver-go/v3/common/stmt"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
 )
 
 var jsonI = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -73,7 +75,7 @@ func (tc *taosConn) generateReqID() uint64 {
 	return atomic.AddUint64(&tc.requestID, 1)
 }
 
-func newTaosConn(cfg *config) (*taosConn, error) {
+func newTaosConn(ctx context.Context, cfg *config) (*taosConn, error) {
 	endpointUrl := &url.URL{
 		Scheme: cfg.net,
 		Host:   fmt.Sprintf("%s:%d", cfg.addr, cfg.port),
@@ -111,6 +113,7 @@ func newTaosConn(cfg *config) (*taosConn, error) {
 	go tc.read()
 	err = tc.connect()
 	if err != nil {
+		logx.WithContext(ctx).Errorf("websocket 连接失败,err:%v", err)
 		tc.Close()
 	}
 	return tc, nil
@@ -527,7 +530,7 @@ func (tc *taosConn) queryCtx(ctx context.Context, query string, args []driver.Na
 	return rs, err
 }
 
-func (tc *taosConn) doQuery(_ context.Context, query string, args []driver.NamedValue) (*WSQueryResp, error) {
+func (tc *taosConn) doQuery(ctx context.Context, query string, args []driver.NamedValue) (*WSQueryResp, error) {
 	if tc.isClosed() {
 		return nil, driver.ErrBadConn
 	}
@@ -543,6 +546,15 @@ func (tc *taosConn) doQuery(_ context.Context, query string, args []driver.Named
 		query = prepared
 	}
 	reqID := tc.generateReqID()
+	startTime := timex.Now()
+	duration := timex.Since(startTime)
+	defer func() {
+		if duration > time.Second {
+			logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosWsQuery reqID:%v slowcall query: %s", reqID, query)
+		} else {
+			logx.WithContext(ctx).WithDuration(duration).Infof("[SQL] taosWsQuery reqID:%v query: %s", reqID, query)
+		}
+	}()
 	tc.buf.Reset()
 
 	WriteUint64(tc.buf, reqID) // req id

@@ -3,8 +3,8 @@ package wrapper
 import (
 	"testing"
 
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
 
 func TestGetWhiteList(t *testing.T) {

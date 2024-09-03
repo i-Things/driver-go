@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/errors"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/errors"
 )
 
 // @author: xftan

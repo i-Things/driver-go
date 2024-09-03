@@ -18,7 +18,7 @@ import "C"
 import (
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 )
 
 // typedef void (*__taos_async_whitelist_fn_t)(void *param, int code, TAOS *taos, int numOfWhiteLists, uint64_t* pWhiteLists);

@@ -4,12 +4,12 @@ import (
 	"errors"
 	"unsafe"
 
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/common/tmq"
+	taosError "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/common/tmq"
-	taosError "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper"
 )
 
 type Consumer struct {

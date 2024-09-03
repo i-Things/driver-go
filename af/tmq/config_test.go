@@ -3,7 +3,7 @@ package tmq
 import (
 	"testing"
 
-	"github.com/taosdata/driver-go/v3/wrapper"
+	"github.com/i-Things/driver-go/v3/wrapper"
 )
 
 // @author: xftan

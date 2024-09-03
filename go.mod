@@ -1,4 +1,4 @@
-module github.com/taosdata/driver-go/v3
+module github.com/i-Things/driver-go/v3
 
 go 1.18
 

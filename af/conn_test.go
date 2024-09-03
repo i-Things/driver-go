@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/i-Things/driver-go/v3/common"
+	param2 "github.com/i-Things/driver-go/v3/common/param"
+	"github.com/i-Things/driver-go/v3/wrapper"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common"
-	param2 "github.com/taosdata/driver-go/v3/common/param"
-	"github.com/taosdata/driver-go/v3/wrapper"
 )
 
 func TestMain(m *testing.M) {

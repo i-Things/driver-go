@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
 )
 
 // @author: xftan

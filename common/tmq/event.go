@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	taosError "github.com/taosdata/driver-go/v3/errors"
+	taosError "github.com/i-Things/driver-go/v3/errors"
 )
 
 type Data struct {

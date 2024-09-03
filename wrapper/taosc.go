@@ -33,9 +33,9 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/common/pointer"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
+	"github.com/i-Things/driver-go/v3/common/pointer"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 )
 
 // TaosFreeResult void taos_free_result(TAOS_RES *res);

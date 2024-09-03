@@ -15,12 +15,12 @@ import (
 	"unsafe"
 
 	"github.com/gorilla/websocket"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/common/tmq"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/common/tmq"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
 )
 
 type Consumer struct {

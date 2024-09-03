@@ -5,9 +5,9 @@ import (
 	"database/sql/driver"
 	"sync"
 
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper"
 )
 
 type connector struct {

@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/i-Things/driver-go/v3/common"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/taosdata/driver-go/v3/common"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
 )
 
 const (

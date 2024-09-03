@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	taosTypes "github.com/i-Things/driver-go/v3/types"
 	"github.com/stretchr/testify/assert"
-	taosTypes "github.com/taosdata/driver-go/v3/types"
 )
 
 func TestParam_SetBool(t *testing.T) {

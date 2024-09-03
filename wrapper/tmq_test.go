@@ -6,13 +6,13 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	tmqcommon "github.com/i-Things/driver-go/v3/common/tmq"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/parser"
-	tmqcommon "github.com/taosdata/driver-go/v3/common/tmq"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
 )
 
 // @author: xftan

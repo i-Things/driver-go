@@ -14,10 +14,10 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/common/pointer"
-	"github.com/taosdata/driver-go/v3/common/tmq"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
+	"github.com/i-Things/driver-go/v3/common/pointer"
+	"github.com/i-Things/driver-go/v3/common/tmq"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 )
 
 var tmqCommitCallbackResultPool = sync.Pool{}

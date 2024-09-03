@@ -16,7 +16,7 @@ import "C"
 import (
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 )
 
 func TaosSetNotifyCB(taosConnect unsafe.Pointer, caller cgo.Handle, notifyType int) int32 {

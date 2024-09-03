@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 
-	"github.com/taosdata/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common"
 )
 
 type connector struct {

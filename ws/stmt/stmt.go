@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/taosdata/driver-go/v3/common/param"
-	"github.com/taosdata/driver-go/v3/common/serializer"
-	taosErrors "github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/ws/client"
+	"github.com/i-Things/driver-go/v3/common/param"
+	"github.com/i-Things/driver-go/v3/common/serializer"
+	taosErrors "github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/ws/client"
 )
 
 type Stmt struct {

@@ -3,7 +3,7 @@ package taosWS
 import (
 	"encoding/json"
 
-	stmtCommon "github.com/taosdata/driver-go/v3/common/stmt"
+	stmtCommon "github.com/i-Things/driver-go/v3/common/stmt"
 )
 
 type WSConnectReq struct {

@@ -8,7 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/google/uuid"
-	"github.com/taosdata/driver-go/v3/common/pointer"
+	"github.com/i-Things/driver-go/v3/common/pointer"
 )
 
 var tUUIDHashId int64

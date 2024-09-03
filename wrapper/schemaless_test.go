@@ -6,8 +6,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper"
 )
 
 func prepareEnv() unsafe.Pointer {

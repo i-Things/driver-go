@@ -7,10 +7,10 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/taosdata/driver-go/v3/common/parser"
-	"github.com/taosdata/driver-go/v3/errors"
-	"github.com/taosdata/driver-go/v3/wrapper"
-	"github.com/taosdata/driver-go/v3/wrapper/cgo"
+	"github.com/i-Things/driver-go/v3/common/parser"
+	"github.com/i-Things/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/wrapper"
+	"github.com/i-Things/driver-go/v3/wrapper/cgo"
 )
 
 func main() {

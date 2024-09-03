@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/taosdata/driver-go/v3/errors"
+	"github.com/i-Things/driver-go/v3/errors"
 )
 
 var (

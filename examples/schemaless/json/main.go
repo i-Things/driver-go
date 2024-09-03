@@ -1,6 +1,6 @@
 package main
 
-import "github.com/taosdata/driver-go/v3/af"
+import "github.com/i-Things/driver-go/v3/af"
 
 func main() {
 	conn, err := af.Open("", "root", "taosdata", "", 0)

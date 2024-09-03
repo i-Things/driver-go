@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	taosError "github.com/i-Things/driver-go/v3/errors"
 	"github.com/stretchr/testify/assert"
-	taosError "github.com/taosdata/driver-go/v3/errors"
 )
 
 func TestDataMessage_String(t *testing.T) {

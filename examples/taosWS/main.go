@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/taosdata/driver-go/v3/taosWS"
+	_ "github.com/i-Things/driver-go/v3/taosWS"
 )
 
 func main() {

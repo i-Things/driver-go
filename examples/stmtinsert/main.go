@@ -3,9 +3,9 @@ package main
 import (
 	"time"
 
-	"github.com/taosdata/driver-go/v3/af"
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/common/param"
+	"github.com/i-Things/driver-go/v3/af"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/common/param"
 )
 
 func main() {

@@ -3,8 +3,8 @@ package stmt
 import (
 	"fmt"
 
-	"github.com/taosdata/driver-go/v3/common"
-	"github.com/taosdata/driver-go/v3/types"
+	"github.com/i-Things/driver-go/v3/common"
+	"github.com/i-Things/driver-go/v3/types"
 )
 
 type StmtField struct {
