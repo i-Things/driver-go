@@ -3,6 +3,7 @@ package taosRestful
 import (
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"database/sql/driver"
 	"encoding/base64"
 	"errors"
@@ -48,18 +49,24 @@ func newTaosConn(cfg *config) (*taosConn, error) {
 		readBufferSize = 4 << 10
 	}
 	tc := &taosConn{cfg: cfg, readBufferSize: readBufferSize}
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableCompression:    cfg.disableCompression,
+	}
+	if cfg.skipVerify {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
 	tc.client = &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			DisableCompression:    cfg.disableCompression,
-		},
+		Transport: transport,
 	}
 	path := "/rest/sql"
 	if len(cfg.dbName) != 0 {
@@ -230,6 +237,7 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 		return nil, fmt.Errorf("server response: %s - %s", resp.Status, string(body))
 	}
 	respBody := resp.Body
+	defer ioutil.ReadAll(respBody)
 	if !tc.cfg.disableCompression && EqualFold(resp.Header.Get("Content-Encoding"), "gzip") {
 		respBody, err = gzip.NewReader(resp.Body)
 		if err != nil {
@@ -339,6 +347,16 @@ func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, e
 						row[column] = iter.ReadUint32()
 					case common.TSDB_DATA_TYPE_UBIGINT:
 						row[column] = iter.ReadUint64()
+					case common.TSDB_DATA_TYPE_VARBINARY, common.TSDB_DATA_TYPE_GEOMETRY:
+						data := iter.ReadStringAsSlice()
+						if len(data)%2 != 0 {
+							iter.ReportError("read varbinary", fmt.Sprintf("invalid length %s", string(data)))
+						}
+						value := make([]byte, len(data)/2)
+						for i := 0; i < len(data); i += 2 {
+							value[i/2] = hexCharToDigit(data[i])<<4 | hexCharToDigit(data[i+1])
+						}
+						row[column] = value
 					default:
 						row[column] = nil
 						iter.Skip()
@@ -384,4 +402,15 @@ func lower(b byte) byte {
 		return b + ('a' - 'A')
 	}
 	return b
+}
+
+func hexCharToDigit(char byte) uint8 {
+	switch {
+	case char >= '0' && char <= '9':
+		return char - '0'
+	case char >= 'a' && char <= 'f':
+		return char - 'a' + 10
+	default:
+		panic("assertion failed: invalid hex char")
+	}
 }

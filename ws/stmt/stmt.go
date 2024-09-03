@@ -1,6 +1,7 @@
 package stmt
 
 import (
+	"bytes"
 	"encoding/binary"
 
 	"github.com/taosdata/driver-go/v3/common/param"
@@ -30,10 +31,10 @@ func (s *Stmt) Prepare(sql string) error {
 		Action: STMTPrepare,
 		Args:   args,
 	}
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	respBytes, err := s.connector.sendText(reqID, envelope)
@@ -66,10 +67,10 @@ func (s *Stmt) SetTableName(name string) error {
 		Action: STMTSetTableName,
 		Args:   args,
 	}
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	respBytes, err := s.connector.sendText(reqID, envelope)
@@ -102,7 +103,8 @@ func (s *Stmt) SetTags(tags *param.Param, bindType *param.ColumnType) error {
 	binary.LittleEndian.PutUint64(reqData, reqID)
 	binary.LittleEndian.PutUint64(reqData[8:], s.id)
 	binary.LittleEndian.PutUint64(reqData[16:], SetTagsMessage)
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	envelope.Msg.Grow(24 + len(block))
 	envelope.Msg.Write(reqData)
 	envelope.Msg.Write(block)
@@ -131,13 +133,13 @@ func (s *Stmt) BindParam(params []*param.Param, bindType *param.ColumnType) erro
 	binary.LittleEndian.PutUint64(reqData, reqID)
 	binary.LittleEndian.PutUint64(reqData[8:], s.id)
 	binary.LittleEndian.PutUint64(reqData[16:], BindMessage)
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	envelope.Msg.Grow(24 + len(block))
 	envelope.Msg.Write(reqData)
 	envelope.Msg.Write(block)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(reqData)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	respBytes, err := s.connector.sendBinary(reqID, envelope)
@@ -169,10 +171,10 @@ func (s *Stmt) AddBatch() error {
 		Action: STMTAddBatch,
 		Args:   args,
 	}
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	respBytes, err := s.connector.sendText(reqID, envelope)
@@ -204,10 +206,10 @@ func (s *Stmt) Exec() error {
 		Action: STMTExec,
 		Args:   args,
 	}
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	respBytes, err := s.connector.sendText(reqID, envelope)
@@ -230,6 +232,51 @@ func (s *Stmt) GetAffectedRows() int {
 	return s.lastAffected
 }
 
+func (s *Stmt) UseResult() (*Rows, error) {
+	reqID := s.connector.generateReqID()
+	req := &UseResultReq{
+		ReqID:  reqID,
+		StmtID: s.id,
+	}
+	args, err := client.JsonI.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	action := &client.WSAction{
+		Action: STMTUseResult,
+		Args:   args,
+	}
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
+	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
+	if err != nil {
+		return nil, err
+	}
+	respBytes, err := s.connector.sendText(reqID, envelope)
+	if err != nil {
+		return nil, err
+	}
+	var resp UseResultResp
+	err = client.JsonI.Unmarshal(respBytes, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Code != 0 {
+		return nil, taosErrors.NewError(resp.Code, resp.Message)
+	}
+	return &Rows{
+		buf:           &bytes.Buffer{},
+		conn:          s.connector,
+		client:        s.connector.client,
+		resultID:      resp.ResultID,
+		fieldsCount:   resp.FieldsCount,
+		fieldsNames:   resp.FieldsNames,
+		fieldsTypes:   resp.FieldsTypes,
+		fieldsLengths: resp.FieldsLengths,
+		precision:     resp.Precision,
+	}, nil
+}
+
 func (s *Stmt) Close() error {
 	reqID := s.connector.generateReqID()
 	req := &CloseReq{
@@ -244,10 +291,10 @@ func (s *Stmt) Close() error {
 		Action: STMTClose,
 		Args:   args,
 	}
-	envelope := s.connector.client.GetEnvelope()
+	envelope := client.GlobalEnvelopePool.Get()
+	defer client.GlobalEnvelopePool.Put(envelope)
 	err = client.JsonI.NewEncoder(envelope.Msg).Encode(action)
 	if err != nil {
-		s.connector.client.PutEnvelope(envelope)
 		return err
 	}
 	s.connector.sendTextWithoutResp(envelope)

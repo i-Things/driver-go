@@ -138,11 +138,11 @@ func (stmt *Stmt) CheckNamedValue(v *driver.NamedValue) error {
 			case reflect.Bool:
 				v.Value = types.TaosBool(rv.Bool())
 			case reflect.Float32, reflect.Float64:
-				v.Value = types.TaosBool(rv.Float() == 1)
+				v.Value = types.TaosBool(rv.Float() > 0)
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				v.Value = types.TaosBool(rv.Int() == 1)
+				v.Value = types.TaosBool(rv.Int() > 0)
 			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				v.Value = types.TaosBool(rv.Uint() == 1)
+				v.Value = types.TaosBool(rv.Uint() > 0)
 			case reflect.String:
 				vv, err := strconv.ParseBool(rv.String())
 				if err != nil {
