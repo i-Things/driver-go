@@ -530,7 +530,7 @@ func (tc *taosConn) queryCtx(ctx context.Context, query string, args []driver.Na
 	return rs, err
 }
 
-func (tc *taosConn) doQuery(ctx context.Context, query string, args []driver.NamedValue) (*WSQueryResp, error) {
+func (tc *taosConn) doQuery(ctx context.Context, query string, args []driver.NamedValue) (rsp *WSQueryResp, err error) {
 	if tc.isClosed() {
 		return nil, driver.ErrBadConn
 	}
@@ -549,10 +549,14 @@ func (tc *taosConn) doQuery(ctx context.Context, query string, args []driver.Nam
 	startTime := timex.Now()
 	duration := timex.Since(startTime)
 	defer func() {
-		if duration > time.Second {
-			logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosWsQuery reqID:%v slowcall query: %s", reqID, query)
+		if err != nil {
+			logx.WithContext(ctx).WithDuration(duration).Errorf("[SQL] taosWsQuery reqID:%v query: %s err:%v", reqID, query, err)
 		} else {
-			logx.WithContext(ctx).WithDuration(duration).Infof("[SQL] taosWsQuery reqID:%v query: %s", reqID, query)
+			if duration > time.Second {
+				logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosWsQuery reqID:%v slowcall query: %s", reqID, query)
+			} else {
+				logx.WithContext(ctx).WithDuration(duration).Infof("[SQL] taosWsQuery reqID:%v query: %s", reqID, query)
+			}
 		}
 	}()
 	tc.buf.Reset()
@@ -563,7 +567,7 @@ func (tc *taosConn) doQuery(ctx context.Context, query string, args []driver.Nam
 	WriteUint16(tc.buf, 1)                  // version
 	WriteUint32(tc.buf, uint32(len(query))) // sql length
 	tc.buf.WriteString(query)
-	err := tc.writeBinary(tc.buf.Bytes())
+	err = tc.writeBinary(tc.buf.Bytes())
 	if err != nil {
 		return nil, err
 	}
