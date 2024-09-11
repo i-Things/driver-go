@@ -14,7 +14,6 @@ import (
 	"github.com/zeromicro/go-zero/core/syncx"
 	"github.com/zeromicro/go-zero/core/timex"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -202,8 +201,8 @@ func (tc *taosConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.
 	return nil, &taosErrors.TaosError{Code: 0xffff, ErrStr: "restful does not support transaction"}
 }
 
-func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (*common.TDEngineRestfulResp, error) {
-	body := ioutil.NopCloser(strings.NewReader(sql))
+func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (r *common.TDEngineRestfulResp, err error) {
+	body := io.NopCloser(strings.NewReader(sql))
 	req := &http.Request{
 		Method:     http.MethodPost,
 		URL:        tc.url,
@@ -219,39 +218,46 @@ func (tc *taosConn) taosQuery(ctx context.Context, sql string, bufferSize int) (
 	}
 	startTime := timex.Now()
 	duration := timex.Since(startTime)
-	resp, err := tc.client.Do(req)
-	if duration > slowThreshold.Load() {
-		logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosQuery: slowcall - %s", sql)
-	} else {
-		logx.WithContext(ctx).WithDuration(duration).Infof("sql taosQuery: %s", sql)
-	}
+	var resp *http.Response
+	resp, err = tc.client.Do(req)
+	defer func() {
+		if err != nil {
+			logx.WithContext(ctx).WithDuration(duration).Errorf("[SQL] taosRestQuery  query: %s err:%v", sql, err)
+		} else {
+			if duration > time.Second {
+				logx.WithContext(ctx).WithDuration(duration).Slowf("[SQL] taosRestQuery  slowcall query: %s", sql)
+			} else {
+				logx.WithContext(ctx).WithDuration(duration).Infof("[SQL] taosRestQuery  query: %s", sql)
+			}
+		}
+	}()
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
 		return nil, fmt.Errorf("server response: %s - %s", resp.Status, string(body))
 	}
 	respBody := resp.Body
-	defer ioutil.ReadAll(respBody)
+	defer io.ReadAll(respBody)
 	if !tc.cfg.disableCompression && EqualFold(resp.Header.Get("Content-Encoding"), "gzip") {
 		respBody, err = gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, err
 		}
 	}
-	data, err := marshalBody(respBody, bufferSize)
+	r, err = marshalBody(respBody, bufferSize)
 	if err != nil {
 		return nil, err
 	}
-	if data.Code != 0 {
-		return nil, taosErrors.NewError(data.Code, data.Desc)
+	if r.Code != 0 {
+		return nil, taosErrors.NewError(r.Code, r.Desc)
 	}
-	return data, nil
+	return r, nil
 }
 
 func marshalBody(body io.Reader, bufferSize int) (*common.TDEngineRestfulResp, error) {
